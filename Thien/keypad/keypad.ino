@@ -1,13 +1,15 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
+#include <ESP32Servo.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo myServo;
 
 const byte rows = 4;
 const byte columns = 4;
 String correct_pass = "123456";
 int buttonPin = 18;
-int servoPin = 16;
+int servoPin = 2;
 int warningPin = 17;
 
 char keys[rows][columns] =
@@ -289,23 +291,34 @@ int menu()
 
 void control_output(int pin)
 {
-  for (int i = 0; i < 3; i++)
+  if(pin == servoPin)
   {
-    digitalWrite(pin, 1);
-    delay(500);
-    digitalWrite(pin, 0);
-    delay(500);
+    myServo.write(180);
+    delay(5000);
+    myServo.write(0);
+  }
+  else
+  {
+    for (int i = 0; i < 3; i++)
+    {
+      digitalWrite(pin, 1);
+      delay(500);
+      digitalWrite(pin, 0);
+      delay(500);
+    }
   }
 }
 
 void setup() {
   Serial.begin(115200);
+  myServo.attach(servoPin);
   lcd.init();
   lcd.backlight();
   pinMode(buttonPin, INPUT);
-  pinMode(servoPin, OUTPUT);
+  //pinMode(servoPin, OUTPUT);
   pinMode(warningPin, OUTPUT);
   delay(1000);
+  myServo.write(0);
   lcd.clear();
   Serial.println("PRESS THE BUTTON IF YOU WANT TO UNLOCK........");
 }
