@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "session": "^0.1.0",
+    "ws": "^8.18.0"
+  }
+}
