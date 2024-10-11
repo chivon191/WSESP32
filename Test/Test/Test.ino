@@ -59,8 +59,7 @@ const char* password = "vonvaquoc";
 
 const char* serverName = "192.168.1.5"; 
 const int serverPort = 8080; 
-int door_stat_current;
-int door_stat_pre;
+int door_stat;
 
 Servo sg90;
 
@@ -73,6 +72,7 @@ void setup() {
   delay(1);
   lcd.clear();
   lcd.setCursor(0,0);
+
   lcd.print("   1st Class");
   lcd.setCursor(0,1);
   lcd.print("    Security");
@@ -85,17 +85,21 @@ void setup() {
   sg90.setPeriodHertz(50);
   sg90.attach(PIN_SG90, 500, 2400);
   nfc.begin();
+  delay(2000);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   readNFC();
+  door_stat = digitalRead(14);
   if(tagId==cardId1 or tagId==tagId1)
   {
     sg90.write(90);
-    delay(5000);
+    tagId = "None";
+  }
+  if(!door_stat)
+  {
     sg90.write(0);
-    tagId="None";
   }
 }
 
@@ -106,6 +110,6 @@ void readNFC() {
     tagId = tag.getUidString();
     Serial.println("Tag id");
     Serial.println(tagId);
+    delay(500);
   }
-  delay(1000);
 }

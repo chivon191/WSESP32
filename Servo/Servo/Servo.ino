@@ -14,9 +14,9 @@ String tagId = "None";
 byte nuidPICC[4];
 
 // Chân GPIO kết nối với loa Piezo
-const int piezoPin = 15;
+const int piezoPin = 0;
 
-#define PIN_SG90 13 // Output pin used
+#define PIN_SG90 23 // Output pin used
 
 Servo sg90;
 
@@ -28,6 +28,7 @@ void setup() {
   sg90.setPeriodHertz(50);          // PWM frequency for SG90
   sg90.attach(PIN_SG90, 500, 2400); // Minimum and maximum pulse width (in µs) to go from 0° to 180
   nfc.begin();
+  delay(2000);
 }
 
 void loop() {
@@ -35,26 +36,25 @@ void loop() {
   readNFC();
   if(tagId==cardId1)
   {
-    int pos = 90;
-    sg90.write(pos);
-    digitalWrite(piezoPin,HIGH);
-    delay(125);
-    digitalWrite(piezoPin,LOW);
+    sg90.write(90);
+    success();
+    tagId = "None";
   }
   else if(tagId==tagId1)
   {
-    int pos = 0;
-    sg90.write(pos);
+    sg90.write(0);
     digitalWrite(piezoPin,HIGH);
     delay(10);
     digitalWrite(piezoPin,LOW);
+    tagId = "None";
   }
 }
 
 void success() {
-  tone(piezoPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+  tone(0, 2700); // Tần số 2700 Hz, thời gian 100 ms
+  noTone(piezoPin);
   delay(125); // Đợi 125 ms
-  tone(piezoPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+  tone(0, 2700); // Tần số 2700 Hz, thời gian 100 ms
   noTone(piezoPin);
 }
 
@@ -72,5 +72,5 @@ void readNFC() {
     Serial.println("Tag id");
     Serial.println(tagId);
   }
-  delay(1000);
+  delay(10);
 }
