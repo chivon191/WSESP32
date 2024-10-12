@@ -82,25 +82,37 @@ void setup() {
   //pinMode(ledPin, OUTPUT);
   pinMode(piezoPin, OUTPUT);
   //pinMode(vibrationPin, INPUT_PULLUP);
-  sg90.setPeriodHertz(50);
-  sg90.attach(PIN_SG90, 500, 2400);
+  sg90.attach(PIN_SG90);
+  sg90.write(3);
   nfc.begin();
   delay(2000);
 }
-
 void loop() {
   // put your main code here, to run repeatedly:
+      
+  door_stat = digitalRead(18);
+  Serial.println(door_stat);
   readNFC();
-  door_stat = digitalRead(14);
-  if(tagId==cardId1 or tagId==tagId1)
-  {
-    sg90.write(90);
-    tagId = "None";
-  }
-  if(!door_stat)
-  {
-    sg90.write(0);
-  }
+    if(tagId == cardId1){
+      while(!digitalRead(18))
+      {
+        sg90.write(90);
+      }
+      while(digitalRead(18))
+      {
+        delay(1000);
+      }
+      sg90.write(0);
+      tagId = "";
+
+    }
+  
+}
+
+bool check_layer1() {
+    readNFC();
+    if(tagId==cardId1 or tagId==tagId1) return true;
+    return false;
 }
 
 void readNFC() {
@@ -110,6 +122,6 @@ void readNFC() {
     tagId = tag.getUidString();
     Serial.println("Tag id");
     Serial.println(tagId);
-    delay(500);
+    delay(1000);
   }
 }
