@@ -52,9 +52,11 @@ void loop() {
 
 void success() {
   tone(piezoPin,2700); // Tần số 2700 Hz, thời gian 100 ms
+  delay(100);
   noTone(piezoPin);
   delay(125); // Đợi 125 ms
   tone(piezoPin, 2700); // Tần số 2700 Hz, thời gian 100 ms
+  delay(100);
   noTone(piezoPin);
 }
 
