@@ -3,7 +3,6 @@
 myKeypad::myKeypad() : lcd(0x27, 16, 2), keypad(makeKeymap(keys), rowPins, columnPins, rows, columns) {
     const byte rows = 4;
     const byte columns = 4;
-    correct_pass = "";
 
     char keys[rows][columns] = {
         {'1', '2', '3', 'A'},
