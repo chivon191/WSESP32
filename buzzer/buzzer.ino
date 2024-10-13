@@ -1,5 +1,5 @@
 // Chân GPIO kết nối với loa Piezo
-const int piezoPin = 12;
+const int piezoPin = 0;
 
 void setup() {
   // Khởi tạo chân GPIO làm đầu ra

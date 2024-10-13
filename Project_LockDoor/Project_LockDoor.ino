@@ -72,7 +72,7 @@ void setup() {
   lcd.backlight();
   delay(1);
   lcd.clear();
-  pinMode(18, INPUT_PULLUP);
+  pinMode(w, INPUT_PULLUP);
   pinMode(19, INPUT_PULLUP);
   //pinMode(ledPin, OUTPUT);
   pinMode(piezoPin, OUTPUT);
