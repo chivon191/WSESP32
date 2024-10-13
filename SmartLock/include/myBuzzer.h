@@ -4,4 +4,4 @@ class myBuzzer {
         myBuzzer(const int pin);
         void success();
         void error();
-}
+};

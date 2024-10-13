@@ -77,8 +77,6 @@ void setup() {
   lcd.setCursor(0,1);
   lcd.print("    Security");
   pinMode(18, INPUT_PULLUP);
-  pinMode(19, INPUT_PULLUP);
-  pinMode(34, INPUT_PULLUP);
   //pinMode(ledPin, OUTPUT);
   pinMode(piezoPin, OUTPUT);
   //pinMode(vibrationPin, INPUT_PULLUP);
@@ -89,30 +87,119 @@ void setup() {
 }
 void loop() {
   // put your main code here, to run repeatedly:
-      
-  door_stat = digitalRead(18);
-  Serial.println(door_stat);
-  readNFC();
-    if(tagId == cardId1){
-      while(!digitalRead(18))
-      {
-        sg90.write(90);
+    if(check_layer1()){
+      if(check_layer2()){
+        while(!digitalRead(18)) sg90.write(90);
+        while(digitalRead(18)) delay(1000);
+        sg90.write(0);
+        tagId = "";
       }
-      while(digitalRead(18))
-      {
-        delay(1000);
-      }
-      sg90.write(0);
-      tagId = "";
-
     }
   
 }
 
 bool check_layer1() {
-    readNFC();
-    if(tagId==cardId1 or tagId==tagId1) return true;
+  readNFC();
+  if(tagId==cardId1 or tagId==tagId1) return true;
+  return false;
+}
+
+bool check_layer2() {
+  Serial.println("Enter your password........");
+  lcd.setCursor(1,0);
+  lcd.print("ENTER PASSWORD");
+  if (check_password())
+  {
+    lcd.clear();
+    lcd.setCursor(5,0);//-----Unlock------
+    lcd.print("Unlock");
+    lcd.setCursor(4,1);//-----Success-----
+    lcd.print("Successs");
+    Serial.println("\n------------------------------------------------");
+    Serial.println("Unlock success...........");
+    Serial.println("------------------------------------------------");
+    lcd.clear();
+    return true;
+  }
+  else
+  {
+    lcd.clear();
+    lcd.setCursor(5,0);//-----Unlock------
+    lcd.print("Unlock");
+    lcd.setCursor(5,1);//-----Failed-----
+    lcd.print("Failed");
+    Serial.println("\n------------------------------------------------");
+    Serial.println("Unlock failed...........");
+    Serial.println("------------------------------------------------");
+    lcd.clear();
     return false;
+  }
+}
+
+char read_character()
+{
+  char key = keypad.getKey();
+  if (key) return key;
+  return '\0';
+}
+
+int check_password()
+{
+  String pass = "";
+  char key = '\0';
+  int count = 3;
+  int size = 4;
+  lcd.clear();
+  lcd.setCursor(1,0);
+  lcd.print("ENTER PASSWORD");
+  lcd.setCursor(5,1);
+  while (count)
+  {
+    while (size)
+    {
+      key = read_character();
+      delay(1);
+      if (key != '\0' && key >= '1' && key <= '9')
+      {
+        Serial.print(key);
+        lcd.print(key);
+        pass += String(key);
+        key = '\0';
+        size--;
+      }
+      else if (key == 'D')
+      {
+        size = 4;
+        pass = "";
+        lcd.setCursor(5,1);
+        lcd.print("      ");
+        lcd.setCursor(5,1);
+        Serial.println("\nReset enter password...");
+      }
+      else if(key == 'A') return 2;
+    }
+    if (pass == correct_pass) break;
+    else
+    {
+      pass = "";
+      count--;
+      size = 4;
+      if (count)
+      {
+        Serial.println("\nFailed........");
+        Serial.println("You have " + String(count) + " times for enter password.");
+        Serial.println("You must wait 3 seconds.");
+        delay(3000);
+        Serial.println("----------------------------------------------------");
+        Serial.println("Enter password again.....");
+        lcd.setCursor(5,1);
+        lcd.print("      ");
+        lcd.setCursor(5,1);
+      }
+    }
+  }
+  if (count) return 1;
+  return 0;
 }
 
 void readNFC() {

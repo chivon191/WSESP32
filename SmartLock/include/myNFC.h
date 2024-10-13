@@ -5,7 +5,7 @@
 
 class myNFC {
     public:
-        String cardID, tagID1, tagID2, readID = ""; 
+        String cardID, readID = "None"; 
         myNFC();
         void readNFC();
     private:

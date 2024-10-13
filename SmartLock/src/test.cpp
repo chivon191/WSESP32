@@ -28,8 +28,6 @@ bool check_layer2() {
 }
 
 void setup() {
-    lcd.init();
-    lcd.backlight();
     delay(1);
     lcd.clear();
     pinMode(18, INPUT_PULLUP);
@@ -37,7 +35,7 @@ void setup() {
 }
 
 void loop() {
-    if (check_layer1 == true) {
+    if (check_layer1()) {
         
     }
     else {

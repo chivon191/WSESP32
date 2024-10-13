@@ -13,4 +13,4 @@ class myKeypad {
         int add_new_password();
         int check_password();
         int change_password();
-}
+};

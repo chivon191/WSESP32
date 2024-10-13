@@ -1,6 +1,7 @@
 #include "myAS608.h"
 
-myAS608::myAS608() {
+myAS608::myAS608() :
+{
   HardwareSerial mySerial(2);  
   finger = Adafruit_Fingerprint(&mySerial);
   mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
