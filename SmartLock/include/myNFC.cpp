@@ -15,3 +15,11 @@ void myNFC::readNFC() {
     }
     delay(1000);
 }
+
+int myNFC::checkNFC() {
+    readNFC();
+    if (readID == cardID or readID == tagID1) {
+        return 1;
+    }
+    return 0;
+}

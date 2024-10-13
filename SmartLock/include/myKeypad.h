@@ -1,11 +1,13 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 
+extern String correct_pass; 
+
 class myKeypad {
     private:
         LiquidCrystal_I2C lcd;
         Keypad keypad;
-        String correct_pass;
+
     public:
         myKeypad();
         char read_character();

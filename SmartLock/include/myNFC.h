@@ -8,6 +8,7 @@ class myNFC {
         String cardID, readID = "None"; 
         myNFC();
         void readNFC();
+        int checkNFC();
     private:
         PN532_I2C pn532_i2c;
         NfcAdapter nfc;
