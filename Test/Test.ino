@@ -27,6 +27,8 @@ NfcAdapter nfc = NfcAdapter(pn532_i2c);
 String correct_pass = "1234";
 String cardId1 = "63 6B 6D 0B";
 String tagId1= "E1 B2 99 02";
+int users_numb = 2;
+String nfcId [users_numb] = [];
 String tagId = "None";
 byte nuidPICC[4];
 
@@ -198,6 +200,80 @@ int check_password()
     }
   }
   if (count) return 1;
+  return 0;
+}
+
+int change_password()
+{
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Change password");
+  delay(1000);
+  Serial.println("Enter your password.....");
+  int check = check_password();
+  if (check == 1)
+  {
+    String newPass1 = "";
+    String newPass2 = "";
+    int times_enter = 2;
+    while (times_enter)
+    {
+      String pass = "";
+      int size = 4;
+      if (times_enter == 2)
+      {
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Enter new pass");
+        Serial.println("\nEnter your new password.......");
+      }
+      else
+      {
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("Re-enter pass");
+        Serial.println("\nRe-enter your new password......");
+      }
+      lcd.setCursor(5,1);
+      while (size)
+      {
+        char key = read_character();
+        delay(1);
+        if (key >= '1' && key <= '9')
+        {
+          Serial.print(key);
+          lcd.print(key);
+          pass += String(key);
+          key = '\0';
+          size--;
+        }
+        else if (key == 'D')
+        {
+          size = 4;
+          pass = "";
+          lcd.setCursor(5,1);
+          lcd.print("      ");
+          lcd.setCursor(5,1);
+          Serial.println("\nReset enter password...");
+        }
+        else if (key == 'A')
+        {
+          lcd.clear();
+          lcd.print("Exit");
+          delay(1000);
+          return 0;
+        }
+      }
+      if (times_enter == 2) newPass1 = pass;
+      else newPass2 = pass;
+      times_enter--;
+    }
+    if (newPass1 == newPass2)
+    {
+      correct_pass = newPass1;
+      return 1;
+    }
+  }
   return 0;
 }
 
