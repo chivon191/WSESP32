@@ -1,11 +1,11 @@
-#include "myNFC.h"
+#include "MyNFC.h"
 
-myNFC::myNFC() : pn532_i2c(Wire), nfc(pn532_i2c) 
+MyNFC::MyNFC() : pn532_i2c(Wire), nfc(pn532_i2c) 
 {
     nfc.begin();
 }
 
-void myNFC::readNFC() {
+void MyNFC::readNFC() {
     if(nfc.tagPresent())
     {
         NfcTag tag = nfc.read();
@@ -16,9 +16,9 @@ void myNFC::readNFC() {
     delay(1000);
 }
 
-int myNFC::checkNFC() {
+int MyNFC::checkNFC() {
     readNFC();
-    if (readID == cardID or readID == tagID1) {
+    if (readID == cardID or readID == tagID) {
         return 1;
     }
     return 0;
