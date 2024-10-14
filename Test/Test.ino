@@ -49,7 +49,7 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, columnPins, rows, columns);
 uint8_t id;
 
 // Chân GPIO kết nối với loa Piezo
-const int piezoPin = 0;
+const int piezoPin = 15;
 /*const int vibrationPin = 14;  // Chân GPIO kết nối cảm biến rung*/
 
 
@@ -85,17 +85,16 @@ void setup() {
   nfc.begin();
   delay(2000);
 }
+
 void loop() {
   // put your main code here, to run repeatedly:
-    if(check_layer1()){
-      if(check_layer2()){
-        while(!digitalRead(18)) sg90.write(90);
-        while(digitalRead(18)) delay(1000);
-        sg90.write(0);
-        tagId = "";
-      }
+  if(check_layer1()){
+    if(check_layer2()){
+      while(!digitalRead(18)) sg90.write(90);
+      while(digitalRead(18)) delay(1000);
+      sg90.write(0);
     }
-  
+  }
 }
 
 bool check_layer1() {
