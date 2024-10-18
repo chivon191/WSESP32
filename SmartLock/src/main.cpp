@@ -20,7 +20,7 @@ int firstClassSecurity = 0;
 String correct_pass = "";
 
 bool check_layer1() {
-  if (nfc.checkNFC() or vantay.checkFingerprint()) {
+  if (nfc.checkNFC()) {
     return true;
   }
   return false;
@@ -82,5 +82,4 @@ void loop() {
         sg90.write(0);
     }
   }
-  keypad.menu(buzzer);
 }

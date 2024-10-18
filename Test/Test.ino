@@ -25,15 +25,14 @@ PN532_I2C pn532_i2c(Wire);
 
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 String correct_pass = "1234";
-String cardId1 = "63 6B 6D 0B";
-String tagId1= "E1 B2 99 02";
-int users_numb = 2;
-String nfcId [users_numb] = [];
+String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
 String tagId = "None";
 byte nuidPICC[4];
 
 const byte rows = 4;
 const byte columns = 4;
+
+int size = sizeof(nfcId)/sizeof(nfcId[0]);
 
 char keys[columns][rows] =
 {
@@ -275,6 +274,13 @@ int change_password()
     }
   }
   return 0;
+}
+
+void addnfc() {
+  readNFC();
+  String temp = tagId;
+  nfcId[size] = temp;
+  size += 1;
 }
 
 void readNFC() {
