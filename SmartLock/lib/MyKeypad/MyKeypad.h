@@ -1,5 +1,6 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
+#include "MyBuzzer.h"
 
 extern String correct_pass; 
 
@@ -23,7 +24,7 @@ class MyKeypad {
     public:
         MyKeypad(LiquidCrystal_I2C &lcd);
         char read_character();
-        void menu();
+        void menu(MyBuzzer &buzzer);
         int add_new_password();
         int check_password();
         int change_password();

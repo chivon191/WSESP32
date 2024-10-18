@@ -1,3 +1,6 @@
+#ifndef MYBUZZER_H
+#define MYBUZZER_H
+
 class MyBuzzer {
     public:
         const int buzzerPin;
@@ -5,3 +8,5 @@ class MyBuzzer {
         void success();
         void error();
 };
+
+#endif
