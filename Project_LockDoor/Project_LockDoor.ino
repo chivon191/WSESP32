@@ -116,16 +116,11 @@ int firstClassSecurity = 0;
 
 void loop() {
   webSocket.loop();
-  if(tagId==cardId1 or tagId==tagId1)
-  {
-    lcd.clear();
-    firstClassSecurity = 0;
-    if(check_layer1()){
-      if(check_layer2()){
-        while(!digitalRead(18)) sg90.write(90);
-        while(digitalRead(18)) delay(1000);
-        sg90.write(0);
-      }
+  if(check_layer1()){
+    if(check_layer2()){
+      while(!digitalRead(18)) sg90.write(90);
+      while(digitalRead(18)) delay(1000);
+      sg90.write(0);
     }
   }
 }
