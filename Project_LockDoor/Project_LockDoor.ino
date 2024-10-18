@@ -16,6 +16,13 @@
 
 #define PIN_SG90 23 // Output pin used
 
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+PN532_I2C pn532_i2c(Wire);
+
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 String correct_pass = "1234";
 String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
