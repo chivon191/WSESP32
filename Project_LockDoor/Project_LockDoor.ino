@@ -1,7 +1,7 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
-//#include <ESPAsyncWebServer.h>
-//#include <WebSocketsClient.h>
+#include <ESPAsyncWebServer.h>
+#include <WebSocketsClient.h>
 #include <Adafruit_Fingerprint.h>
 #include <Wire.h>
 #include <PN532_I2C.h>
@@ -16,22 +16,16 @@
 
 #define PIN_SG90 23 // Output pin used
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-
-HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-
-PN532_I2C pn532_i2c(Wire);
-
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 String correct_pass = "1234";
-String cardId1 = "63 6B 6D 0B";
-String tagId1= "E1 B2 99 02";
+String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
 String tagId = "None";
 byte nuidPICC[4];
 
 const byte rows = 4;
 const byte columns = 4;
+
+int size = sizeof(nfcId)/sizeof(nfcId[0]);
 
 char keys[columns][rows] =
 {
@@ -50,7 +44,7 @@ uint8_t id;
 
 // Chân GPIO kết nối với loa Piezo
 const int piezoPin = 15;
-/*const int vibrationPin = 14;  // Chân GPIO kết nối cảm biến rung*/
+const int vibrationPin = 2;
 
 
 const char* ssid = "FPT Telecom";
@@ -72,19 +66,21 @@ void setup() {
   lcd.backlight();
   delay(1);
   lcd.clear();
-  pinMode(w, INPUT_PULLUP);
-  pinMode(19, INPUT_PULLUP);
-  //pinMode(ledPin, OUTPUT);
+  lcd.setCursor(0,0);
+
+  lcd.print("   1st Class");
+  lcd.setCursor(0,1);
+  lcd.print("    Security");
+  pinMode(18, INPUT_PULLUP);
+
   pinMode(piezoPin, OUTPUT);
-  //pinMode(vibrationPin, INPUT_PULLUP);
-  sg90.setPeriodHertz(50);
-  sg90.attach(PIN_SG90, 500, 2400);
-
+  pinMode(vibrationPin, INPUT_PULLUP);
+  sg90.attach(PIN_SG90);
+  sg90.write(3);
   nfc.begin();
+  delay(2000);
 
-  //digitalWrite(ledPin, LOW);
-
-  /*WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Đang kết nối WiFi...");
@@ -95,8 +91,8 @@ void setup() {
   webSocket.onEvent(webSocketEvent);
 
   Serial.println("WebSocket đang chờ kết nối...");
-  */
-  /*mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
+  
+  mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
 
   finger.begin(57600);
   if (finger.verifyPassword()) {
@@ -104,7 +100,7 @@ void setup() {
   } else {
     Serial.println("Không tìm thấy cảm biến vân tay :(");
     while (1) { delay(1); }
-  }*/
+  }
 
 }
 
@@ -112,131 +108,60 @@ int alivePass = 0;
 int firstClassSecurity = 0;
 
 void loop() {
-  //webSocket.loop();
-  readNFC();
+  webSocket.loop();
   if(tagId==cardId1 or tagId==tagId1)
   {
     lcd.clear();
     firstClassSecurity = 0;
-    Serial.println("CHECK 1");
-    tagId = "None";
-    if(!correct_pass.length())
-    {
-      Serial.println("No password. Please enter your password........");
-      lcd.setCursor(0,0);
-      lcd.print("No pass");
-      lcd.setCursor(0,1);
-      lcd.print("Enter passowrd");
-      delay(1);
-      if(add_new_password())
-      {
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print("Success");
-        delay(1);
-        alivePass = 1;
-        Serial.println("\nPassword updated successfully..........");
-        Serial.println("------------------------------------------------");
-      }
-      else 
-      {
-        alivePass = 0;
-        lcd.setCursor(0,0);
-        lcd.print("Failed");
-        delay(1);
-        Serial.println("\n------------------------------------------------");
-      }
-    }
-    else if(alivePass || correct_pass.length())
-    {
-      Serial.println("Enter your password........");
-      lcd.setCursor(1,0);
-      lcd.print("ENTER PASSWORD");
-      int result_check_password = check_password();
-      if (result_check_password == 1)
-      {
-        sg90.write(90);
-        digitalWrite(piezoPin,HIGH);
-        delay(10);
-        digitalWrite(piezoPin,LOW);
-        firstClassSecurity = 1;
-        lcd.clear();
-        lcd.setCursor(5,0);//-----Unlock------
-        lcd.print("Unlock");
-        lcd.setCursor(4,1);//-----Success-----
-        lcd.print("Successs");
-        Serial.println("\n------------------------------------------------");
-        Serial.println("Unlock success...........");
-        Serial.println("------------------------------------------------");
-        lcd.clear();
-      }
-      else if(result_check_password == 0)
-      {
-        firstClassSecurity = 0;
-        lcd.clear();
-        lcd.setCursor(5,0);//-----Unlock------
-        lcd.print("Unlock");
-        lcd.setCursor(5,1);//-----Failed-----
-        lcd.print("Failed");
-        Serial.println("\n------------------------------------------------");
-        Serial.println("Unlock failed...........");
-        Serial.println("------------------------------------------------");
-        lcd.clear();
-      }
-      if (firstClassSecurity)
-      {
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print("A to exit");
-        lcd.setCursor(0,1);
-        lcd.print("B to menu");
-        Serial.println("PRESS 'A' KEY TO EXIT or PRESS 'B' KEY TO GO TO MENU");
-        while (true)
-        {
-          char key = '\0';
-          while (key != 'A' && key != 'B')
-          {
-            key = read_character();
-            delay(1);
-          }
-          lcd.clear();
-          if (key == 'B')
-          {
-            menu();
-            break;
-          }
-          else
-          {
-            lcd.clear();
-            lcd.print("Exit");
-            delay(1);
-            Serial.println("------------------------------------------------");
-            sg90.write(0);
-            break;
-          }
-        }
+    if(check_layer1()){
+      if(check_layer2()){
+        while(!digitalRead(18)) sg90.write(90);
+        while(digitalRead(18)) delay(1000);
+        sg90.write(0);
       }
     }
   }
-  /*checkFingerprint();
+}
 
-  // Nếu có dữ liệu từ Serial, đọc tùy chọn
-  if (Serial.available()) {
-    char option = Serial.read();
-    switch (option) {
-      case '1':
-        addFingerprint();
-        break;
-      case '2':
-        deleteFingerprint();
-        break;
-      default:
-        Serial.println("Lựa chọn không hợp lệ.");
-        break;
-    }
-    delay(1); // tránh lặp quá nhanh
-  }*/
-  
+bool check_layer1() {
+  readNFC();
+  for(int i = 0; i < size; i++){
+    if(tagId==nfcId[i]) return true;
+  }
+  else if(checkFingerprint()) return true;
+  return false;
+}
+
+bool check_layer2() {
+  Serial.println("Enter your password........");
+  lcd.setCursor(1,0);
+  lcd.print("ENTER PASSWORD");
+  if (check_password())
+  {
+    lcd.clear();
+    lcd.setCursor(5,0);//-----Unlock------
+    lcd.print("Unlock");
+    lcd.setCursor(4,1);//-----Success-----
+    lcd.print("Successs");
+    Serial.println("\n------------------------------------------------");
+    Serial.println("Unlock success...........");
+    Serial.println("------------------------------------------------");
+    lcd.clear();
+    return true;
+  }
+  else
+  {
+    lcd.clear();
+    lcd.setCursor(5,0);//-----Unlock------
+    lcd.print("Unlock");
+    lcd.setCursor(5,1);//-----Failed-----
+    lcd.print("Failed");
+    Serial.println("\n------------------------------------------------");
+    Serial.println("Unlock failed...........");
+    Serial.println("------------------------------------------------");
+    lcd.clear();
+    return false;
+  }
 }
 
 char read_character()
@@ -244,73 +169,6 @@ char read_character()
   char key = keypad.getKey();
   if (key) return key;
   return '\0';
-}
-
-int add_new_password()
-{
-  int size;
-  int times_enter = 2;
-  String newPass = "";
-  String checknewPass = "";
-  while(times_enter)
-  {
-    String pass = "";
-    size = 4;
-    if(times_enter==2)
-    {
-      Serial.println("Enter your password......");
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("Enter password");
-    }
-    else
-    {
-      Serial.println("\nRe-enter your password........");
-      lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("Re-enter pass");
-    }
-    lcd.setCursor(5,1);
-    while(size)
-    {
-      char key = read_character();
-      delay(1);
-      if(key >= '1' && key <= '9')
-      {
-        Serial.print(key);
-        lcd.print(key);
-        pass += key;
-        size--;
-      }
-      else if(key == 'D')
-      {
-        size = 4;
-        pass = "";
-        lcd.setCursor(0,1);
-        lcd.print("                ");
-        lcd.setCursor(5,1);
-        Serial.println("\nReset enter password.........");
-      }
-      else if(key == 'A')
-      {
-        lcd.clear();
-        lcd.setCursor(5,0);
-        lcd.print("Exit");
-        delay(1000);
-        break;
-      }
-    }
-    //if(size) break;
-    if(times_enter==2) newPass = pass;
-    else checknewPass = pass;
-    times_enter--;
-  }
-  if(!size && newPass == checknewPass)
-  {
-    correct_pass = newPass;
-    return 1;
-  }
-  return 0;
 }
 
 int check_password()
@@ -446,64 +304,25 @@ int change_password()
   return 0;
 }
 
-int menu()
-{
-  int time = 300;
-  char key = '\0';
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("1.ChangePass");
-  lcd.setCursor(0,1);
-  lcd.print("23.AddDeleteCard");
-  Serial.println("------------------------------------------------");
-  Serial.println("MENU. PRESS KEY....");
-  Serial.println("1. Change password.");
-  Serial.println("2. Add card.");
-  Serial.println("3. Delete card.");
-  Serial.println("------------------------------------------------");
-  while (time)
-  {
-    key = read_character();
-    delay(1);
-    if ((key >= '1' && key <= '3') || key == 'C') break;
-    time--;
-  }
-  if (time)
-  {
-    if (key == '1')
-    {
-      if (change_password())
-      {
-        lcd.clear();
-        lcd.print("Success");
-        delay(1000);
-        Serial.println("\nChange password success...........");
-        Serial.println("------------------------------------------------");
-        return 1;
-      }
-      else
-      {
-        lcd.clear();
-        lcd.print("Failed");
-        delay(1000);
-        Serial.println("Failed...........");
-        Serial.println("------------------------------------------------");
-        return 0;
-      }
-    }
-    else if (key == '2' || key == '3')
-    {
-      lcd.clear();
-      lcd.print("Not yet");
-      delay(1000);
-      Serial.println("Chua phat trien");
-      Serial.println("------------------------------------------------");
-    }
-  }
-  return 0;
+void addnfc() {
+  readNFC();
+  String temp = tagId;
+  nfcId[size] = temp;
+  size += 1;
 }
 
-/*void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+void readNFC() {
+  if(nfc.tagPresent())
+  {
+    NfcTag tag = nfc.read();
+    tagId = tag.getUidString();
+    Serial.println("Tag id");
+    Serial.println(tagId);
+    delay(1000);
+  }
+}
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
       Serial.println("WebSocket đã ngắt kết nối.");
@@ -525,7 +344,7 @@ int menu()
       }
       break;
   }
-}*/
+}
 
 void success() {
   tone(piezoPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
@@ -538,17 +357,7 @@ void error() {
   tone(piezoPin, 200, 1000); // Tần số 200 Hz, thời gian 1000 ms
 }
 
-void readNFC() {
-  if(nfc.tagPresent())
-  {
-    NfcTag tag = nfc.read();
-    tagId = tag.getUidString();
-    Serial.println("Tag id");
-    Serial.println(tagId);
-  }
-  delay(1000);
-}
-/*
+
 void addFingerprint() {
   Serial.println("Nhập ID vân tay muốn lưu (1 - 127):");
   id = readNumber();
@@ -662,7 +471,7 @@ uint8_t getFingerprintEnroll() {
     Serial.println("Lưu vân tay thất bại.");
     return false; // Trả về false nếu lưu thất bại
   }
-}*/
+}
 
 uint8_t readNumber() {
   uint8_t num = 0;

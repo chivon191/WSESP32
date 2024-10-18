@@ -100,7 +100,10 @@ void loop() {
 
 bool check_layer1() {
   readNFC();
-  if(tagId==cardId1 or tagId==tagId1) return true;
+  for(int i = 0; i < size; i++){
+    if(tagId==nfcId[i]) return true;
+  }
+  else if(checkFingerprint()) return true;
   return false;
 }
 
