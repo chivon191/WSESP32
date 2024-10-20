@@ -17,6 +17,7 @@
 #define PIN_SG90 2 // Output pin used
 #define sw420Pin 15
 #define ledPin 17
+#define buzzerPin 0
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -50,9 +51,6 @@ byte columnPins[columns] = {26, 25, 33, 32};
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, columnPins, rows, columns);
 
 uint8_t id;
-
-// Chân GPIO kết nối với loa Piezo
-const int piezoPin = 15;
 
 const char* ssid = "donnn";
 const char* password = "1234567890";
@@ -328,31 +326,41 @@ void deleteFingerprint() {
 }
 
 bool checkFingerprint() {
-  Serial.println("Đặt ngón tay lên cảm biến để kiểm tra...");
-  uint8_t p = finger.getImage();
-  if (p == FINGERPRINT_OK) {
-    p = finger.image2Tz();
-    if (p == FINGERPRINT_OK) {
-      p = finger.fingerFastSearch();
+  int attempts = 0;  // Biến đếm số lần thử quét vân tay
+
+  while (attempts < 3) {  // Cho phép người dùng thử tối đa 3 lần
+    Serial.println("Đặt ngón tay lên cảm biến để kiểm tra...");
+    uint8_t p = finger.getImage();
+    
+    if (p == FINGERPRINT_OK) {  // Người dùng đã đặt ngón tay lên cảm biến
+      attempts++;  // Tính là 1 lần thử
+      Serial.print("Số lần thử hiện tại: ");
+      Serial.println(attempts);
+
+      p = finger.image2Tz();  // Tiếp tục xử lý vân tay
       if (p == FINGERPRINT_OK) {
-        Serial.print("Đã nhận diện thành công ID #");
-        Serial.print(finger.fingerID);
-        Serial.print(" với độ tin cậy: ");
-        Serial.println(finger.confidence);
-        return true;
-      } else {
-        Serial.println("Không tìm thấy vân tay!");
-      }
+        p = finger.fingerFastSearch();
+        if (p == FINGERPRINT_OK) {
+          Serial.print("Đã nhận diện thành công ID #");
+          Serial.print(finger.fingerID);
+          Serial.print(" với độ tin cậy: ");
+          Serial.println(finger.confidence);
+          return true;  // Nhận diện thành công, trả về true
+        } else {
+          Serial.println("Không tìm thấy vân tay!");
+        }
+      } 
     } else {
-      Serial.println("Không chuyển đổi được hình ảnh vân tay.");
+      Serial.println("Lỗi khi đọc vân tay hoặc chưa đặt ngón tay lên cảm biến.");
     }
-  } else if (p == FINGERPRINT_NOFINGER) {
-    // Không có vân tay, có thể bỏ qua
-  } else {
-    Serial.println("Lỗi không xác định.");
+
+    // Nếu người dùng không đặt ngón tay hoặc gặp lỗi thì sẽ không tăng attempts
   }
-  return false;
+
+  Serial.println("Bạn đã vượt quá số lần thử vân tay cho phép.");
+  return false;  // Nếu quá 3 lần mà vẫn không thành công, trả về false
 }
+
 
 char key = read_character();
 
@@ -412,23 +420,40 @@ int menu()
   return 0;
 }
 
+void success() {
+  tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+  delay(125); // Đợi 125 ms
+  tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+}
+
+// Hàm báo lỗi
+void error() {
+  tone(buzzerPin, 200, 1000); // Tần số 200 Hz, thời gian 1000 ms
+}
+
 bool check_layer1() {
   key = read_character();
   if (key == '1')
   {
-    while(1) {
-      if(checkFingerprint()) return true;
+    while (true) {
+      if(checkFingerprint()) {
+        // success();
+        return true;
+      }
+      return false;
     }
-    return false;
   }
   if (key == '2')
   {
     readNFC();
     for(int i = 0; i < size; i++){
-      if(tagId==nfcId[i]) return true;
+      if(tagId==nfcId[i]) {
+        // success();
+        return true;
+      }
     }
-    return false;
   }
+  // error();
   return false;
 }
 
@@ -479,7 +504,7 @@ void setup() {
   pinMode(sw420Pin, INPUT);
   pinMode(18, INPUT_PULLUP);
   pinMode(ledPin, OUTPUT);
-  pinMode(piezoPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
 
   sg90.attach(PIN_SG90);
   sg90.write(3);
