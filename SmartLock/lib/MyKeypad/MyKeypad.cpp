@@ -9,54 +9,54 @@ char MyKeypad::read_character() {
     return keypad.getKey(); // Trả về '\0' nếu không có key nào
 }
 
-int MyKeypad::add_new_password() {
-    String newPass1 = "", newPass2 = "";
-    int attempts = 2; // Số lần nhập lại
-    while (attempts > 0) {
-        String pass = "";
-        int size = 6; // Kích thước mật khẩu
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(attempts == 2 ? "Enter password" : "Re-enter pass");
-        lcd.setCursor(5, 1);
+// int MyKeypad::add_new_password() {
+//     String newPass1 = "", newPass2 = "";
+//     int attempts = 2; // Số lần nhập lại
+//     while (attempts > 0) {
+//         String pass = "";
+//         int size = 6; // Kích thước mật khẩu
+//         lcd.clear();
+//         lcd.setCursor(0, 0);
+//         lcd.print(attempts == 2 ? "Enter password" : "Re-enter pass");
+//         lcd.setCursor(5, 1);
 
-        while (size) {
-            char key = read_character();
-            delay(100);
-            if (key >= '1' && key <= '9') {
-                Serial.print(key);
-                lcd.print("*"); // Hiển thị dấu * thay vì mật khẩu
-                pass += key;
-                size--;
-            } else if (key == 'D') {
-                size = 6; // Reset
-                pass = "";
-                lcd.setCursor(0, 1);
-                lcd.print("                ");
-                lcd.setCursor(5, 1);
-                Serial.println("\nReset enter password...");
-            } else if (key == 'A') {
-                lcd.clear();
-                lcd.print("Exit");
-                delay(1000);
-                return 0;
-            }
-        }
+//         while (size) {
+//             char key = read_character();
+//             delay(100);
+//             if (key >= '1' && key <= '9') {
+//                 Serial.print(key);
+//                 lcd.print("*"); // Hiển thị dấu * thay vì mật khẩu
+//                 pass += key;
+//                 size--;
+//             } else if (key == 'D') {
+//                 size = 6; // Reset
+//                 pass = "";
+//                 lcd.setCursor(0, 1);
+//                 lcd.print("                ");
+//                 lcd.setCursor(5, 1);
+//                 Serial.println("\nReset enter password...");
+//             } else if (key == 'A') {
+//                 lcd.clear();
+//                 lcd.print("Exit");
+//                 delay(1000);
+//                 return 0;
+//             }
+//         }
 
-        if (newPass1.isEmpty()) {
-            newPass1 = pass;
-        } else {
-            newPass2 = pass;
-        }
-        attempts--;
-    }
+//         if (newPass1.isEmpty()) {
+//             newPass1 = pass;
+//         } else {
+//             newPass2 = pass;
+//         }
+//         attempts--;
+//     }
 
-    if (newPass1 == newPass2) {
-        correct_pass = newPass1;
-        return 1; // Thành công
-    }
-    return 0; // Thất bại
-}
+//     if (newPass1 == newPass2) {
+//         correct_pass = newPass1;
+//         return 1; // Thành công
+//     }
+//     return 0; // Thất bại
+// }
 
 int MyKeypad::check_password() {
     String pass = "";

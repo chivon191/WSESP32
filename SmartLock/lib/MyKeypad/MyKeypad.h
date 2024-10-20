@@ -25,7 +25,7 @@ class MyKeypad {
         MyKeypad(LiquidCrystal_I2C &lcd);
         char read_character();
         void menu(MyBuzzer &buzzer);
-        int add_new_password();
+        // int add_new_password();
         int check_password();
         int change_password();
 };

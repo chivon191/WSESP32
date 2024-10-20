@@ -1,6 +1,6 @@
 #include "MyAS608.h"
 #include "MyKeypad.h"
-#include "MyBuzzer.h"
+// #include "MyBuzzer.h"
 #include "MyNFC.h"
 #include <ESP32Servo.h>
 #include <AsyncTCP.h>
@@ -8,14 +8,14 @@
 #include <WebSocketsClient.h>
 #include <WiFi.h>
 
-#define servoPin 23
-#define sw420Pin 12
+#define servoPin 2
+#define sw420Pin 15
 #define ledPin 13
 
 LiquidCrystal_I2C  lcd(0x27, 16, 2);
 MyKeypad keypad(lcd);
 WebSocketsClient webSocket;  
-MyAS608 vantay(16, 17);
+// MyAS608 vantay(16, 17);
 MyBuzzer buzzer(15);
 MyNFC nfc;
 Servo sg90;
@@ -45,11 +45,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       Serial.printf("Dữ liệu nhận được từ server: %s\n", payload);
       
       if (String((char*)payload) == "opendoor") {
-        digitalWrite(ledPin, HIGH);
-        Serial.println("Đã bật đèn LED");
-        delay(3000);
-        digitalWrite(ledPin, LOW);
-        Serial.println("Đã tắt đèn LED");
+        Serial.println("Đã mở cửa");
+        while(!digitalRead(18)) sg90.write(90);
+        Serial.println("Đã đóng cửa");
+        while(digitalRead(18)) delay(1000);
+        sg90.write(0);
         webSocket.sendTXT("closedoor");
       }
       break;
@@ -144,4 +144,3 @@ void loop() {
     }
   }
 }
-

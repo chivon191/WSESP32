@@ -11,15 +11,17 @@
 #include <LiquidCrystal_I2C.h>
 #include <ESP32Servo.h>
 
-#define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
-#define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
+// #define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
+// #define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
 
-#define PIN_SG90 23 // Output pin used
+#define PIN_SG90 2 // Output pin used
+#define sw420Pin 15
+#define ledPin 17
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+// HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
+// Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 PN532_I2C pn532_i2c(Wire);
 
@@ -77,8 +79,9 @@ void setup() {
   lcd.print("   1st Class");
   lcd.setCursor(0,1);
   lcd.print("    Security");
+  pinMode(sw420Pin, INPUT);
   pinMode(18, INPUT_PULLUP);
-  //pinMode(ledPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
   pinMode(piezoPin, OUTPUT);
   //pinMode(vibrationPin, INPUT_PULLUP);
   sg90.attach(PIN_SG90);
@@ -96,6 +99,16 @@ void loop() {
       sg90.write(0);
     }
   }
+  else {
+    int value = digitalRead(sw420Pin);
+    Serial.print(value);
+    if(value == 1) {
+      digitalWrite(ledPin, HIGH);
+      delay(1000);
+      digitalWrite(ledPin, LOW);
+    }
+    delay(100);
+  }
 }
 
 bool check_layer1() {
@@ -103,7 +116,7 @@ bool check_layer1() {
   for(int i = 0; i < size; i++){
     if(tagId==nfcId[i]) return true;
   }
-  if(checkFingerprint()) return true;
+  // if(checkFingerprint()) return true;
   return false;
 }
 
