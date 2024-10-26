@@ -50,7 +50,7 @@ byte columnPins[columns] = {26, 25, 33, 32};
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, columnPins, rows, columns);
 
-uint8_t id;
+uint8_t id = 0;
 
 const char* ssid = "donnn";
 const char* password = "1234567890";
@@ -213,7 +213,22 @@ int change_password()
   return 0;
 }
 
-void addnfc() {
+bool addnfc() {
+  readNFC();
+  for(int i = 0; i < size; i++){
+    if(tagId==nfcId[i]) {
+      return false;
+    }
+    else{
+      String temp = tagId;
+      nfcId[size] = temp;
+      size += 1;
+      return true;
+    }
+  }
+}
+
+void removenfc() {
   readNFC();
   String temp = tagId;
   nfcId[size] = temp;
@@ -229,99 +244,114 @@ uint8_t readNumber() {
   return num;
 }
 
-uint8_t getFingerprintEnroll() {
+bool getFingerprintEnroll(uint8_t id) {
+  Serial.print("Bắt đầu đăng ký vân tay cho ID: ");
+  Serial.println(id);
+  
   int p = -1;
-  Serial.println("Đặt ngón tay lên cảm biến...");
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
-    if (p == FINGERPRINT_NOFINGER) {
-      // Đợi người dùng đặt ngón tay lên cảm biến
-      delay(500); // Đợi một chút trước khi kiểm tra lại
-    } else if (p == FINGERPRINT_IMAGEFAIL) {
-      Serial.println("Lỗi chụp hình ảnh");
-      return p;
-    } else if (p != FINGERPRINT_OK) {
-      Serial.println("Lỗi không xác định");
-      return p;
+    switch (p) {
+      case FINGERPRINT_OK:
+        Serial.println("Ảnh vân tay đã được chụp.");
+        break;
+      case FINGERPRINT_NOFINGER:
+        Serial.println("Không có ngón tay trên cảm biến.");
+        break;
+      case FINGERPRINT_PACKETRECIEVEERR:
+        Serial.println("Lỗi nhận gói tin.");
+        break;
+      case FINGERPRINT_IMAGEFAIL:
+        Serial.println("Không thể chụp ảnh vân tay.");
+        return false;
+      default:
+        Serial.println("Lỗi không xác định.");
+        return false;
     }
   }
 
+  // Tiếp tục xử lý và lưu ảnh vân tay
   p = finger.image2Tz(1);
   if (p != FINGERPRINT_OK) {
-    Serial.println("Lỗi chuyển đổi hình ảnh");
-    return p;
+    Serial.println("Không thể chuyển ảnh thành mẫu vân tay.");
+    return false;
   }
 
-  Serial.println("Lấy dấu vân tay lần 1 thành công. Hãy tháo tay.");
-  delay(2000);
-  while (p != FINGERPRINT_NOFINGER) {
-    p = finger.getImage();
+  // Đăng ký vân tay với ID
+  p = finger.createModel();
+  if (p == FINGERPRINT_OK) {
+    Serial.println("Tạo mẫu vân tay thành công.");
+    p = finger.storeModel(id);
+    if (p == FINGERPRINT_OK) {
+      Serial.println("Lưu mẫu vân tay thành công.");
+      return true;
+    } else {
+      Serial.println("Lưu mẫu vân tay thất bại.");
+    }
+  } else {
+    Serial.println("Tạo mẫu vân tay thất bại.");
   }
+  
+  return false;
+}
 
-  Serial.println("Đặt lại ngón tay lần nữa...");
-  p = -1;
-  while (p != FINGERPRINT_OK) {
-    p = finger.getImage();
-    if (p == FINGERPRINT_NOFINGER) {
-      // Đợi người dùng đặt ngón tay lên cảm biến
-      delay(500); // Đợi một chút trước khi kiểm tra lại
-    } else if (p == FINGERPRINT_IMAGEFAIL) {
-      Serial.println("Lỗi chụp hình ảnh");
-      return p;
-    } else if (p != FINGERPRINT_OK) {
-      Serial.println("Lỗi không xác định");
-      return p;
+bool addFingerprint() {
+  id++;
+  Serial.println("Bắt đầu thêm vân tay.");
+  if (getFingerprintEnroll(id)) {
+    Serial.println("Đăng ký vân tay thành công");
+    return true;
+  } else {
+    Serial.println("Đăng ký vân tay thất bại");
+    return false;
+  }
+}
+
+bool deleteFingerprint() {
+  int attempts = 0;  // Biến đếm số lần thử quét vân tay
+  uint8_t id = 0;    // ID của vân tay cần xóa
+
+  // Yêu cầu người dùng quét vân tay
+  while (attempts < 3) {  // Cho phép người dùng thử tối đa 3 lần
+    Serial.println("Đặt ngón tay lên cảm biến để xóa...");
+    uint8_t p = finger.getImage();
+
+    if (p == FINGERPRINT_OK) {  // Người dùng đã đặt ngón tay lên cảm biến
+      attempts++;  // Tính là 1 lần thử
+
+      // Chuyển đổi vân tay thành dữ liệu để kiểm tra
+      p = finger.image2Tz();
+      if (p == FINGERPRINT_OK) {
+        // Tìm kiếm vân tay trong cơ sở dữ liệu
+        p = finger.fingerFastSearch();
+        if (p == FINGERPRINT_OK) {
+          id = finger.fingerID;  // Lưu ID của vân tay được tìm thấy
+          Serial.print("Vân tay được phát hiện với ID #");
+          Serial.println(id);
+          break;  // Thoát khỏi vòng lặp nếu tìm thấy
+        } else {
+          Serial.println("Không tìm thấy vân tay!");
+        }
+      }
+    } else {
+      Serial.println("Lỗi khi đọc vân tay hoặc chưa đặt ngón tay lên cảm biến.");
     }
   }
 
-  p = finger.image2Tz(2);
-  if (p != FINGERPRINT_OK) {
-    Serial.println("Lỗi chuyển đổi hình ảnh lần 2");
-    return p;
-  }
-
-  p = finger.createModel();
-  if (p != FINGERPRINT_OK) {
-    Serial.println("Không khớp hai lần quét vân tay");
-    return p;
-  }
-
-  p = finger.storeModel(id);
-  if (p == FINGERPRINT_OK) {
-    return true; // Trả về true nếu lưu thành công
+  // Nếu đã tìm thấy vân tay và ID hợp lệ, tiến hành xóa
+  if (id > 0 && attempts <= 3) {
+    Serial.print("Xóa vân tay với ID: ");
+    Serial.println(id);
+    if (finger.deleteModel(id) == FINGERPRINT_OK) {
+      Serial.println("Xóa vân tay thành công.");
+      return true;
+    } else {
+      Serial.println("Xóa vân tay thất bại.");
+      return false;
+    }
   } else {
-    Serial.println("Lưu vân tay thất bại.");
-    return false; // Trả về false nếu lưu thất bại
-  }
-}
-
-void addFingerprint() {
-  Serial.println("Nhập ID vân tay muốn lưu (1 - 127):");
-  id = readNumber();
-  if (id == 0) return;
-
-  Serial.print("Đang thêm vân tay ID #");
-  Serial.println(id);
-
-  if (getFingerprintEnroll()) {
-    Serial.println("Đã lưu vân tay thành công!");
-  } else {
-    Serial.println("Lưu vân tay thất bại!");
-  }
-
-  // Quay lại menu chính
-  Serial.println("Quay lại menu chính...");
-}
-
-void deleteFingerprint() {
-  Serial.println("Nhập ID vân tay muốn xóa (1 - 127):");
-  id = readNumber();
-  if (id == 0) return;
-
-  if (finger.deleteModel(id) == FINGERPRINT_OK) {
-    Serial.println("Đã xóa vân tay thành công!");
-  } else {
-    Serial.println("Xóa vân tay thất bại!");
+    Serial.println("Không thể xác định vân tay để xóa.");
+    return false;
   }
 }
 
@@ -348,6 +378,10 @@ bool checkFingerprint() {
           return true;  // Nhận diện thành công, trả về true
         } else {
           Serial.println("Không tìm thấy vân tay!");
+
+          lcd.setCursor(0,1);
+          lcd.print("Wrong!        ");
+          delay(3000);
         }
       } 
     } else {
@@ -362,35 +396,85 @@ bool checkFingerprint() {
 }
 
 
+
+bool Fingerprintmenu(){
+  char key_2 = '\0';
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("1.Add fingerprint");
+  lcd.setCursor(0, 1);
+  lcd.print("2.Del fingerprint");
+  delay(1000);
+  Serial.println("1. Add new fingerprint.");
+  Serial.println("2. Delete fingerprint.");
+
+  key_2 = read_character();
+
+  if(key_2 == '1') {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Scan fingerprint");
+    if(addFingerprint()) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Add finger successfull");
+      return true;
+    }
+    else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Add finger error");
+      return false;
+    }
+  }
+
+  else if(key_2 == '2') {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Scan fingerprint");
+    if(deleteFingerprint()) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Delete finger successfull");
+      return true;
+    }
+    else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Delete finger error");
+      return false;
+    }
+  }
+
+}
+
 char key = read_character();
 
-int menu()
-{
+
+int menu() {
   int time = 300;
-  char key = '\0';
+  char key_1 = '\0';
   lcd.clear();
   lcd.setCursor(0,0);
-  lcd.print("1.Change Password");
+  lcd.print("1.ChangePass");
   lcd.setCursor(0,1);
-  lcd.print("2.Add/DeleteCard");
+  lcd.print("2.Card  3.Finger");
   Serial.println("------------------------------------------------");
   Serial.println("MENU. PRESS KEY....");
   Serial.println("1. Change password.");
-  Serial.println("2. Add card.");
-  Serial.println("3. Delete card.");
+  Serial.println("2. Add/Delete card.");
+  Serial.println("3. Add/Delete fingerprint.");
   Serial.println("------------------------------------------------");
-  while (time)
-  {
+  while (time) {
+    key_1 = read_character();
     delay(100);
-    if ((key >= '1' && key <= '3') || key == 'C') break;
-    time--;
+    if ((key_1 >= '1' && key_1 <= '3') || key_1 == 'C') break;
+    //time--;
   }
-  if (time)
-  {
-    if (key == '1')
-    {
-      if (change_password())
-      {
+  if (time) {
+    if (key_1 == '1') {
+      if (change_password()) {
         lcd.clear();
         lcd.print("Success");
         delay(1000);
@@ -398,8 +482,7 @@ int menu()
         Serial.println("------------------------------------------------");
         return 1;
       }
-      else
-      {
+      else {
         lcd.clear();
         lcd.print("Failed");
         delay(1000);
@@ -408,13 +491,42 @@ int menu()
         return 0;
       }
     }
-    else if (key == '2' || key == '3')
-    {
+    if (key_1 == '2') {
       lcd.clear();
-      lcd.print("Not yet");
-      delay(1000);
-      Serial.println("Chua phat trien");
-      Serial.println("------------------------------------------------");
+      Serial.println("1. Add new card.");
+      Serial.println("2. Delete card.");
+      key = read_character();
+      if (key == '1') {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Scan card");
+
+      }
+      if (key == '2') {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Scan card");
+      }
+    }
+    if (key_1 == '3') {
+      if (Fingerprintmenu())
+      {
+        lcd.clear();
+        lcd.print("Success");
+        delay(1000);
+        Serial.println("\nsuccess...........");
+        Serial.println("------------------------------------------------");
+        return 1;
+      }
+      else
+      {
+        lcd.clear();
+        lcd.print("Failed");
+        delay(1000);
+        Serial.println("\nFailed...........");
+        Serial.println("------------------------------------------------");
+        return 0;
+      }
     }
   }
   return 0;
@@ -432,9 +544,18 @@ void error() {
 }
 
 bool check_layer1() {
+  lcd.setCursor(0,0);
+  lcd.print("1. Finger");
+  lcd.setCursor(0,1);
+  lcd.print("2. NFC  3. Menu");
   key = read_character();
   if (key == '1')
   {
+    lcd.clear();
+    lcd.setCursor(1,0);
+    lcd.print("Checking");
+    lcd.setCursor(2,1);
+    lcd.print("Fingerprint");
     while (true) {
       if(checkFingerprint()) {
         // success();
@@ -445,13 +566,28 @@ bool check_layer1() {
   }
   if (key == '2')
   {
+    lcd.clear();
+    lcd.setCursor(2,0);
+    lcd.print("Checking NFC");
     readNFC();
     for(int i = 0; i < size; i++){
       if(tagId==nfcId[i]) {
         // success();
+        lcd.setCursor(2, 1);
+        lcd.print("Valid");
+        delay(1000);
+        lcd.clear();
         return true;
       }
     }
+    lcd.setCursor(2, 1);
+    lcd.print("Not valid");
+    delay(2000);
+    lcd.clear();
+  }
+  if(key == '3')
+  {
+    menu();
   }
   // error();
   return false;
@@ -495,12 +631,6 @@ void setup() {
   lcd.init();
   lcd.backlight();
   delay(1);
-  lcd.clear();
-  lcd.setCursor(0,0);
-
-  lcd.print("   1st Class");
-  lcd.setCursor(0,1);
-  lcd.print("    Security");
   pinMode(sw420Pin, INPUT);
   pinMode(18, INPUT_PULLUP);
   pinMode(ledPin, OUTPUT);
