@@ -1,8 +1,9 @@
 #include "MyKeypad.h"
 #include "MyBuzzer.h"
 
-MyKeypad::MyKeypad(LiquidCrystal_I2C &lcd_ref) : lcd(lcd_ref), keypad(makeKeymap(keys), rowPins, columnPins, rows, columns) {
+MyKeypad::MyKeypad(LiquidCrystal_I2C &lcd_ref, String correct_pass) : lcd(lcd_ref), keypad(makeKeymap(keys), rowPins, columnPins, rows, columns) {
     lcd.clear();
+    this->correct_pass = correct_pass;
 }
 
 char MyKeypad::read_character() {

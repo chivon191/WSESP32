@@ -1,6 +1,6 @@
 #include "MyAS608.h"
 
-MyAS608::MyAS608(int const RXD2, int const TXD2) : mySerial(2), finger(&mySerial) {
+MyAS608::MyAS608(int const RXD2, int const TXD2) : mySerial(2), finger(&mySerial), id(0) {
   // Khởi động Serial cho cảm biến vân tay
   mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
   Serial.println("\n\nAS608 Fingerprint sensor initialized.");
@@ -17,13 +17,15 @@ MyAS608::MyAS608(int const RXD2, int const TXD2) : mySerial(2), finger(&mySerial
   }
 }
 
-void MyAS608::addFingerprint() {
-  uint8_t id = 1; // Thay đổi ID khi cần thêm vân tay mới
+bool MyAS608::addFingerprint() {
+  id++;
   Serial.println("Bắt đầu thêm vân tay.");
   if (getFingerprintEnroll(id)) {
     Serial.println("Đăng ký vân tay thành công");
+    return true;
   } else {
     Serial.println("Đăng ký vân tay thất bại");
+    return false;
   }
 }
 
@@ -78,34 +80,87 @@ uint8_t MyAS608::getFingerprintEnroll(uint8_t id) {
   return false;
 }
 
-void MyAS608::deleteFingerprint(uint8_t id) {
-  Serial.print("Xóa vân tay với ID: ");
-  Serial.println(id);
-  if (finger.deleteModel(id) == FINGERPRINT_OK) {
-    Serial.println("Xóa vân tay thành công.");
+bool MyAS608::deleteFingerprint() {
+  int attempts = 0;  // Biến đếm số lần thử quét vân tay
+  uint8_t id = 0;    // ID của vân tay cần xóa
+
+  // Yêu cầu người dùng quét vân tay
+  while (attempts < 3) {  // Cho phép người dùng thử tối đa 3 lần
+    Serial.println("Đặt ngón tay lên cảm biến để xóa...");
+    uint8_t p = finger.getImage();
+
+    if (p == FINGERPRINT_OK) {  // Người dùng đã đặt ngón tay lên cảm biến
+      attempts++;  // Tính là 1 lần thử
+
+      // Chuyển đổi vân tay thành dữ liệu để kiểm tra
+      p = finger.image2Tz();
+      if (p == FINGERPRINT_OK) {
+        // Tìm kiếm vân tay trong cơ sở dữ liệu
+        p = finger.fingerFastSearch();
+        if (p == FINGERPRINT_OK) {
+          id = finger.fingerID;  // Lưu ID của vân tay được tìm thấy
+          Serial.print("Vân tay được phát hiện với ID #");
+          Serial.println(id);
+          break;  // Thoát khỏi vòng lặp nếu tìm thấy
+        } else {
+          Serial.println("Không tìm thấy vân tay!");
+        }
+      }
+    } else {
+      Serial.println("Lỗi khi đọc vân tay hoặc chưa đặt ngón tay lên cảm biến.");
+    }
+  }
+
+  // Nếu đã tìm thấy vân tay và ID hợp lệ, tiến hành xóa
+  if (id > 0 && attempts <= 3) {
+    Serial.print("Xóa vân tay với ID: ");
+    Serial.println(id);
+    if (finger.deleteModel(id) == FINGERPRINT_OK) {
+      Serial.println("Xóa vân tay thành công.");
+      return true;
+    } else {
+      Serial.println("Xóa vân tay thất bại.");
+      return false;
+    }
   } else {
-    Serial.println("Xóa vân tay thất bại.");
+    Serial.println("Không thể xác định vân tay để xóa.");
+    return false;
   }
 }
 
+
 bool MyAS608::checkFingerprint() {
-  Serial.println("Kiểm tra vân tay...");
-  uint8_t p = finger.getImage();
-  if (p == FINGERPRINT_OK) {
-    Serial.println("Ảnh vân tay đã được chụp.");
-    if (finger.image2Tz() == FINGERPRINT_OK) {
-      if (finger.fingerSearch() == FINGERPRINT_OK) {
-        Serial.print("Tìm thấy vân tay với ID: ");
-        Serial.println(finger.fingerID);
-        return true;
-      } else {
-        Serial.println("Không tìm thấy vân tay.");
-      }
+  int attempts = 0;  // Biến đếm số lần thử quét vân tay
+
+  while (attempts < 3) {  // Cho phép người dùng thử tối đa 3 lần
+    Serial.println("Đặt ngón tay lên cảm biến để kiểm tra...");
+    uint8_t p = finger.getImage();
+    
+    if (p == FINGERPRINT_OK) {  // Người dùng đã đặt ngón tay lên cảm biến
+      attempts++;  // Tính là 1 lần thử
+      Serial.print("Số lần thử hiện tại: ");
+      Serial.println(attempts);
+
+      p = finger.image2Tz();  // Tiếp tục xử lý vân tay
+      if (p == FINGERPRINT_OK) {
+        p = finger.fingerFastSearch();
+        if (p == FINGERPRINT_OK) {
+          Serial.print("Đã nhận diện thành công ID #");
+          Serial.print(finger.fingerID);
+          Serial.print(" với độ tin cậy: ");
+          Serial.println(finger.confidence);
+          return true;  // Nhận diện thành công, trả về true
+        } else {
+          Serial.println("Không tìm thấy vân tay!");
+        }
+      } 
     } else {
-      Serial.println("Không thể chuyển ảnh thành mẫu vân tay.");
+      Serial.println("Lỗi khi đọc vân tay hoặc chưa đặt ngón tay lên cảm biến.");
     }
-  } else {
-    Serial.println("Không có ngón tay trên cảm biến.");
+
+    // Nếu người dùng không đặt ngón tay hoặc gặp lỗi thì sẽ không tăng attempts
   }
-  return false;
+
+  Serial.println("Bạn đã vượt quá số lần thử vân tay cho phép.");
+  return false;  // Nếu quá 3 lần mà vẫn không thành công, trả về false
 }
