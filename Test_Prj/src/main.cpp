@@ -30,14 +30,14 @@ PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
 String correct_pass = "1234";
-// String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
-// String tagId = "None";
-// byte nuidPICC[4];
+String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
+String tagId = "None";
+byte nuidPICC[4];
 
 const byte rows = 4;
 const byte columns = 4;
 
-// int size = sizeof(nfcId)/sizeof(nfcId[0]);
+int size = sizeof(nfcId)/sizeof(nfcId[0]);
 
 char keys[columns][rows] =
 {
@@ -63,6 +63,17 @@ const int serverPort = 8080;
 int door_stat;
 
 Servo sg90;
+
+void readNFC() {
+  if(nfc.tagPresent())
+  {
+    NfcTag tag = nfc.read();
+    tagId = tag.getUidString();
+    Serial.println("Tag id");
+    Serial.println(tagId);
+    delay(1000);
+  }
+}
 
 bool checkNFC() {
   readNFC();
@@ -255,6 +266,9 @@ int change_password()
 
 bool deleteFingerprint() {
   Serial.println("Vui lòng scan vân tay muốn xóa...");
+  lcd.setCursor(0, 0);
+  lcd.println("Scan your finger");
+  lcd.print("you want delete");
   for (int i = 0; i < 3; i++) {
     unsigned long startTime = millis();
     while (millis() - startTime < 3000) {
@@ -265,6 +279,11 @@ bool deleteFingerprint() {
             int id = finger.fingerID; // ID của vân tay
             if (finger.deleteModel(id) == FINGERPRINT_OK) {
               Serial.println("Đã xóa vân tay thành công!");
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("DELETE FINGER");
+              lcd.setCursor(5, 1);
+              lcd.print("SUCCESS");
               return true;
             } else {
               Serial.println("Xóa vân tay thất bại.");
@@ -281,11 +300,20 @@ bool deleteFingerprint() {
     }
   }
   Serial.println("Xóa vân tay thất bại sau 3 lần thử.");
+  lcd.clear();
+  lcd.setCursor(1,0);
+  lcd.print("DELETE FINGER");
+  lcd.setCursor(6, 1);
+  lcd.print("ERROR");
   return false;
 }
 
 bool checkFingerprint() {
   Serial.println("Đặt ngón tay lên cảm biến để kiểm tra...");
+  lcd.setCursor(0, 0);
+  lcd.print("Scan your finger");
+  lcd.setCursor(3,1);
+  lcd.print("to unlock");
   for (int i = 0; i < 3; i++) {
     unsigned long startTime = millis();
     while (millis() - startTime < 3000) {
@@ -295,6 +323,11 @@ bool checkFingerprint() {
               if (finger.fingerFastSearch() == FINGERPRINT_OK) {
                   Serial.print("Xác thực vân tay thành công với ID ");
                   Serial.println(finger.fingerID);
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("CHECK FINGER");
+                  lcd.setCursor(5, 1);
+                  lcd.print("SUCCESS");
                   return true;
               } else {
                   Serial.println("Không tìm thấy vân tay.");
@@ -308,6 +341,11 @@ bool checkFingerprint() {
     }
   }
   Serial.println("Xác thực vân tay thất bại sau 3 lần thử.");
+  lcd.clear();
+  lcd.setCursor(1,0);
+  lcd.print("CHECK FINGER");
+  lcd.setCursor(6, 1);
+  lcd.print("ERROR");
   return false;
 }
 
@@ -322,6 +360,10 @@ bool enrollFingerprint() {
   int id = getNextAvailableID();
   Serial.print("Đang đăng ký vân tay cho ID: ");
   Serial.println(id);
+  lcd.setCursor(0, 0);
+  lcd.print("Scan your finger");
+  lcd.setCursor(2,1);
+  lcd.print("you want add");
 
   for (int i = 1; i <= 2; i++) {
     while (finger.getImage() != FINGERPRINT_OK) {
@@ -333,16 +375,32 @@ bool enrollFingerprint() {
       return false;
     }
     Serial.println("Lấy dấu vân tay thành công! Hãy tháo tay.");
+    lcd.clear();
+    lcd.setCursor(5,0);
+    lcd.print(i);
+    lcd.print("ST TIME");
+    lcd.setCursor(5, 1);
+    lcd.print("SUCCESS");
     delay(2000);
   }
 
   if (finger.createModel() == FINGERPRINT_OK) {
     if (finger.storeModel(id) == FINGERPRINT_OK) {
       Serial.println("Đăng ký vân tay thành công!");
+      lcd.clear();
+      lcd.setCursor(4,0);
+      lcd.print("ADD FINGER");
+      lcd.setCursor(5, 1);
+      lcd.print("SUCCESS");
       return true;
     }
   }
   Serial.println("Đăng ký vân tay thất bại.");
+  lcd.clear();
+  lcd.setCursor(4,0);
+  lcd.print("ADD FINGER");
+  lcd.setCursor(6, 1);
+  lcd.print("ERROR");
   return false;
 }
 
@@ -471,7 +529,6 @@ void navigateMenu(char key) {
       } else if (submenu == 1) {
         if (key == '1') {
           lcd.clear();
-          lcd.print("Them van tay");
           if (enrollFingerprint() == true) {
             lcd.clear();
             lcd.print("Add finger success");
@@ -483,7 +540,6 @@ void navigateMenu(char key) {
           displayMenu();
         } else if (key == '2') {
           lcd.clear();
-          lcd.print("Xoa van tay");
           if (deleteFingerprint() == true) {
             lcd.clear();
             lcd.print("Del finger success");
@@ -522,7 +578,7 @@ void setup() {
 
   sg90.attach(PIN_SG90);
   sg90.write(3);
-  // nfc.begin();
+  nfc.begin();
   mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
