@@ -10,26 +10,31 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 #include <ESP32Servo.h>
+#include <UniversalTelegramBot.h>
+#include <ArduinoJson.h>
 
 #define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
 #define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
 
-#define PIN_SG90 2 // Output pin used
+#define PIN_SG90 23 // Output pin used
 #define sw420Pin 15
-#define ledPin 17
-#define buzzerPin 0
+#define buzzerPin 2
+#define vibSensor 15
 
-// #define tchFinger 19
+#define BOTtoken "8018398195:AAEw9i4XVnDLDfUnfiWiYjIBMepotF89Zkw"  // Your Bot Token
+#define CHAT_ID "6008983815"
 
+WiFiClientSecure client;
+UniversalTelegramBot bot(BOTtoken, client);
+WebSocketsClient webSocket;  
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-
 HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
 String correct_pass = "1234";
+String correct_pass_old = "1234";
 String nfcId [] = {"63 6B 6D 0B", "E1 B2 99 02"};
 String tagId = "None";
 byte nuidPICC[4];
@@ -56,15 +61,80 @@ uint8_t id = 0;
 
 const char* ssid = "donnn";
 const char* password = "1234567890";
-
-
-const char* serverName = "192.168.1.5"; 
+const char* serverName = "172.20.10.2"; 
 const int serverPort = 8080; 
 int door_stat;
+bool vibrationDetected = false;
 
 Servo sg90;
 
-void readNFC() {
+void message_voice(int mode)
+{
+  if(mode)
+  {
+    unsigned long startTime = millis();
+    while (millis() - startTime < 100) {
+      digitalWrite(buzzerPin, HIGH);
+      delayMicroseconds(185);
+      digitalWrite(buzzerPin, LOW);
+      delayMicroseconds(185);
+    }
+
+    delay(125); // Đợi 125 ms
+
+  // Lặp lại sóng vuông với tần số 2700 Hz trong 100 ms
+    startTime = millis();
+    while (millis() - startTime < 100) {
+      digitalWrite(buzzerPin, HIGH);
+      delayMicroseconds(185);
+      digitalWrite(buzzerPin, LOW);
+      delayMicroseconds(185);
+    }
+  }
+  else if (mode == 0)
+  {
+    unsigned long startTime = millis();
+    while (millis() - startTime < 1000) {
+      digitalWrite(buzzerPin, HIGH);
+      delayMicroseconds(2500);
+      digitalWrite(buzzerPin, LOW);
+      delayMicroseconds(2500);
+    }
+  }
+  else if (mode == 2) {
+    // Biến tần số bắt đầu và kết thúc
+    int lowFreq = 400;  // Tần số thấp (Hz)
+    int highFreq = 1200; // Tần số cao (Hz)
+    
+    // Thời gian phát báo động (tính bằng ms)
+    unsigned long alarmDuration = 2000; // 2 giây
+    unsigned long startTime = millis();
+
+    while (millis() - startTime < alarmDuration) {
+      // Tăng tần số từ lowFreq lên highFreq
+      for (int freq = lowFreq; freq <= highFreq; freq += 20) {
+        unsigned long period = 1000000 / freq; // Chu kỳ tính bằng microsecond
+        digitalWrite(buzzerPin, HIGH);
+        delayMicroseconds(period / 2);
+        digitalWrite(buzzerPin, LOW);
+        delayMicroseconds(period / 2);
+      }
+
+      // Giảm tần số từ highFreq xuống lowFreq
+      for (int freq = highFreq; freq >= lowFreq; freq -= 20) {
+        unsigned long period = 1000000 / freq; // Chu kỳ tính bằng microsecond
+        digitalWrite(buzzerPin, HIGH);
+        delayMicroseconds(period / 2);
+        digitalWrite(buzzerPin, LOW);
+        delayMicroseconds(period / 2);
+      }
+    }
+  }
+}
+
+
+
+bool readNFC() {
   if(nfc.tagPresent())
   {
     NfcTag tag = nfc.read();
@@ -72,55 +142,110 @@ void readNFC() {
     Serial.println("Tag id");
     Serial.println(tagId);
     delay(1000);
+    return true;
   }
+  return false;
 }
 
 bool checkNFC() {
-  readNFC();
-  for(int i = 0; i < size; i++){
-    if(tagId==nfcId[i]) {
-      lcd.setCursor(2, 1);
-      lcd.print("Valid");
-      delay(2000);
-      lcd.clear();
-      return true;
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Scan your card");
+  lcd.setCursor(3,1);
+  lcd.print("to unlock");
+  if (readNFC()) {
+    for(int i = 0; i < size; i++){
+      if(tagId==nfcId[i]) {
+        lcd.clear();
+        lcd.setCursor(5, 0);
+        lcd.print("SUCCESS");
+        lcd.setCursor(2, 1);
+        lcd.print("CHECK CARD");
+        message_voice(1);
+        delay(1500);
+        return true;
+      }
     }
   }
-  lcd.setCursor(2, 1);
-  lcd.print("Not valid");
-  delay(2000);
   lcd.clear();
+  lcd.setCursor(5, 0);
+  lcd.print("ERROR");
+  lcd.setCursor(2, 1);
+  lcd.print("CHECK CARD");
+  message_voice(0);
+  delay(1500);
   return false;
 }
 
 bool addnfc() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Scan your card");
+  lcd.setCursor(2,1);
+  lcd.print("you want add");
   readNFC();
   String temp = tagId;
   for(int i = 0; i < size; i++){
     if(tagId==nfcId[i]) {
+      lcd.clear();
+      lcd.setCursor(6,0);
+      lcd.print("ERROR");
+      lcd.setCursor(3, 1);
+      lcd.print("SAME CARD");
+      delay(1500);
       return false;
     }
   }
   for(int i = 0; i < size; i++){
     if(nfcId[i] == "None") {
       nfcId[i] = temp;
+      lcd.clear();
+      lcd.setCursor(5, 0);
+      lcd.print("SUCCESS");
+      lcd.setCursor(4,1);
+      lcd.print("ADD CARD");
+      delay(1500);
       return true;
     }
   }
   nfcId[size] = temp;
   size += 1;
+  lcd.clear();
+  lcd.setCursor(5, 0);
+  lcd.print("SUCCESS");
+  lcd.setCursor(4,1);
+  lcd.print("ADD CARD");
+  Serial.print("Pass: ");
+  Serial.println(correct_pass); 
+  delay(1500);
   return true;
 }
 
 bool removenfc() {
+  lcd.setCursor(0, 0);
+  lcd.print("Scan your card");
+  lcd.setCursor(2,1);
+  lcd.print("you want del");
   readNFC();
   String temp = tagId;
   for(int i = 0; i < size; i++){
     if(tagId==nfcId[i]) {
       nfcId[i] = "None";
+      lcd.clear();
+      lcd.setCursor(5, 0);
+      lcd.print("SUCCESS");
+      lcd.setCursor(4,1);
+      lcd.print("DEL CARD");
+      delay(1500);
       return true;
     }
   }
+  lcd.clear();
+  lcd.setCursor(6,0);
+  lcd.print("ERROR");
+  lcd.setCursor(2, 1);
+  lcd.print("NO FIND CARD");
+  delay(1500);
   return false;
 }
 
@@ -267,7 +392,8 @@ int change_password()
 bool deleteFingerprint() {
   Serial.println("Vui lòng scan vân tay muốn xóa...");
   lcd.setCursor(0, 0);
-  lcd.println("Scan your finger");
+  lcd.print("Scan your finger");
+  lcd.setCursor(0, 1);
   lcd.print("you want delete");
   for (int i = 0; i < 3; i++) {
     unsigned long startTime = millis();
@@ -284,6 +410,7 @@ bool deleteFingerprint() {
               lcd.print("DELETE FINGER");
               lcd.setCursor(5, 1);
               lcd.print("SUCCESS");
+              delay(1500);
               return true;
             } else {
               Serial.println("Xóa vân tay thất bại.");
@@ -305,6 +432,7 @@ bool deleteFingerprint() {
   lcd.print("DELETE FINGER");
   lcd.setCursor(6, 1);
   lcd.print("ERROR");
+  delay(1500);
   return false;
 }
 
@@ -328,6 +456,8 @@ bool checkFingerprint() {
                   lcd.print("CHECK FINGER");
                   lcd.setCursor(5, 1);
                   lcd.print("SUCCESS");
+                  message_voice(1);
+                  delay(1500);
                   return true;
               } else {
                   Serial.println("Không tìm thấy vân tay.");
@@ -346,6 +476,8 @@ bool checkFingerprint() {
   lcd.print("CHECK FINGER");
   lcd.setCursor(6, 1);
   lcd.print("ERROR");
+  message_voice(0);
+  delay(1500);
   return false;
 }
 
@@ -376,31 +508,33 @@ bool enrollFingerprint() {
     }
     Serial.println("Lấy dấu vân tay thành công! Hãy tháo tay.");
     lcd.clear();
-    lcd.setCursor(5,0);
+    lcd.setCursor(4,0);
     lcd.print(i);
     lcd.print("ST TIME");
-    lcd.setCursor(5, 1);
+    lcd.setCursor(4, 1);
     lcd.print("SUCCESS");
-    delay(2000);
+    delay(1500);
   }
 
   if (finger.createModel() == FINGERPRINT_OK) {
     if (finger.storeModel(id) == FINGERPRINT_OK) {
       Serial.println("Đăng ký vân tay thành công!");
       lcd.clear();
-      lcd.setCursor(4,0);
+      lcd.setCursor(3,0);
       lcd.print("ADD FINGER");
-      lcd.setCursor(5, 1);
+      lcd.setCursor(4, 1);
       lcd.print("SUCCESS");
+      delay(1500);
       return true;
     }
   }
   Serial.println("Đăng ký vân tay thất bại.");
   lcd.clear();
-  lcd.setCursor(4,0);
+  lcd.setCursor(3,0);
   lcd.print("ADD FINGER");
-  lcd.setCursor(6, 1);
+  lcd.setCursor(4, 1);
   lcd.print("ERROR");
+  delay(1500);
   return false;
 }
 
@@ -444,6 +578,7 @@ bool check_layer2() {
     Serial.println("Unlock failed...........");
     Serial.println("------------------------------------------------");
     lcd.clear();
+    message_voice(0);
     return false;
   }
 }
@@ -478,21 +613,45 @@ void displayMenu() {
 }
 
 void controlLock() {
-  while(!digitalRead(18)) sg90.write(90);
-  while(digitalRead(18)) delay(1000);
+  vibrationDetected = false;
+  int timedoorclose = 1, timedooropen = 1;
+  message_voice(1);
+  while(!digitalRead(18) && timedoorclose<=5) 
+  {
+    sg90.write(90);
+    delay(1000);
+    timedoorclose++;
+  }
+  while(digitalRead(18)) 
+  {
+    timedooropen++;
+    delay(1000);
+    while (timedooropen >= 5 && digitalRead(18))
+    {
+      message_voice(0);
+      bot.sendMessage(CHAT_ID, "WARNING! DOOR IS OPENING TOO LONG!", "");
+    }
+  }
   sg90.write(0);
+  timedooropen = 1;
+  timedoorclose = 1;
 }
 
 void navigateMenu(char key) {
   switch (currentMenu) {
     case 0:
       if (key == '1') {
-        lcd.clear();
-        lcd.print("Mo khoa bang NFC");
+        if (checkNFC() == true) {
+          if (check_layer2() == true) {
+            controlLock();
+          }
+        }
+        currentMenu = 0;
+        displayMenu();
       } else if (key == '2') {
         lcd.clear();
         if (checkFingerprint() == true) {
-          if (check_layer2() == true) {
+          if (check_layer2() == true) {       
             controlLock();
           }
         }
@@ -520,7 +679,7 @@ void navigateMenu(char key) {
           currentMenu = 0;
           displayMenu();
         } else if (key == '2') {
-          submenu = 2; // Chuyển sang Quản lý vân tay
+          submenu = 2; // Chuyển sang Quản lý nfc
           displayMenu();
         } else if (key == '3') {
           submenu = 1; // Chuyển sang Quản lý vân tay
@@ -552,15 +711,46 @@ void navigateMenu(char key) {
         }
       } else if (submenu == 2) {
         if (key == '1') {
-          lcd.clear();
-          lcd.print("Them the");
+          addnfc();
+          Serial.print("Pass: ");
+          Serial.print(correct_pass);
+          currentMenu = 0;
+          displayMenu();
         } else if (key == '2') {
-          lcd.clear();
-          lcd.print("Xoa the");
+          removenfc();
+          currentMenu = 0;
+          displayMenu();
         }
       }
       break;
   }
+}
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+    case WStype_DISCONNECTED:
+      Serial.println("WebSocket đã ngắt kết nối.");
+      break;
+    case WStype_CONNECTED:
+      Serial.println("Kết nối WebSocket thành công!");
+      webSocket.sendTXT("Xin chào từ ESP32!");
+      webSocket.sendTXT("Password:" + correct_pass);
+      break;
+    case WStype_TEXT:
+      Serial.printf("Dữ liệu nhận được từ server: %s\n", payload);
+      
+      if (String((char*)payload) == "opendoor") {
+        Serial.println("OPEN DOOR");
+        controlLock();   
+        Serial.println("CLOSE DOOR");
+        webSocket.sendTXT("closedoor");
+      }
+      break;
+  }
+}
+
+void IRAM_ATTR detectsVibration() {
+  vibrationDetected = true;
 }
 
 void setup() {
@@ -573,8 +763,11 @@ void setup() {
   delay(1);
   pinMode(sw420Pin, INPUT);
   pinMode(18, INPUT_PULLUP);
-  pinMode(ledPin, OUTPUT);
   pinMode(buzzerPin, OUTPUT);
+  pinMode(vibSensor, INPUT);
+
+  attachInterrupt(digitalPinToInterrupt(vibSensor), detectsVibration, FALLING);
+  client.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Root certificate for Telegram
 
   sg90.attach(PIN_SG90);
   sg90.write(3);
@@ -591,11 +784,24 @@ void setup() {
     Serial.println("Không tìm thấy cảm biến vân tay :(");
     while (1) { delay(1); }
   }
+
+  WiFi.begin(ssid, password);
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(1000);
+  //   Serial.println("Đang kết nối WiFi...");
+  // }
+  // Serial.println("Đã kết nối WiFi.");
+
+  webSocket.begin(serverName, serverPort, "/ws/?type=esp32"); 
+  webSocket.onEvent(webSocketEvent);
+
+  Serial.println("WebSocket đang chờ kết nối...");
   delay(100);
 }
 
 void loop() {
- char key = keypad.getKey(); // Đọc phím từ keypad
+  webSocket.loop();
+  char key = keypad.getKey(); // Đọc phím từ keypad
   if (key) { // Nếu có phím nhấn
     if (key == 'A') { // Phím quay lại
       if (submenu != 0) {
@@ -608,5 +814,10 @@ void loop() {
     } else {
       navigateMenu(key); // Điều hướng menu dựa trên phím nhấn
     }
+  }
+  if(vibrationDetected) {
+    bot.sendMessage(CHAT_ID, "WARNING!!!", "");
+    Serial.println("Vibration Detected");
+    vibrationDetected = false;
   }
 }
