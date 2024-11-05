@@ -522,17 +522,6 @@ bool enrollFingerprint() {
   return false;
 }
 
-// void success() {
-//   tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
-//   delay(125); // Đợi 125 ms
-//   tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
-// }
-
-// // Hàm báo lỗi
-// void error() {
-//   tone(buzzerPin, 200, 1000); // Tần số 200 Hz, thời gian 1000 ms
-// }
-
 bool check_layer2() {
   lcd.clear();
   Serial.println("Enter your password........");
@@ -574,9 +563,11 @@ void displayMenu() {
   lcd.clear(); // Xóa màn hình LCD trước khi hiển thị nội dung mới
   switch (currentMenu) {
     case 0:
-      lcd.print("1.NFC 2.Finger");
-      lcd.setCursor(0, 1); // Chuyển xuống dòng thứ 2
-      lcd.print("3.Setting");
+      lcd.clear();
+      lcd.setCursor(1, 0);
+      lcd.print("Wellcome home")
+      lcd.setCursor(0, 1);
+      lcd.print("Scan finger/card")
       break;
     case 2: // Menu Cai Dat
       if (submenu == 0) {
@@ -624,24 +615,30 @@ void controlLock() {
 void navigateMenu(char key) {
   switch (currentMenu) {
     case 0:
-      if (key == '1') {
-        if (checkNFC() == true) {
-          if (check_layer2() == true) {
-            controlLock();
-          }
-        }
-        currentMenu = 0;
-        displayMenu();
-      } else if (key == '2') {
-        lcd.clear();
-        if (checkFingerprint() == true) {
-          if (check_layer2() == true) {       
-            controlLock();
-          }
-        }
-        currentMenu = 0;
-        displayMenu();
-      } else if (key == '3') {
+      // if (key == '1') {
+      //   if (checkNFC() == true) {
+      //     if (check_layer2() == true) {
+      //       controlLock();
+      //     }
+      //   }
+      //   currentMenu = 0;
+      //   displayMenu();
+      // } else if (key == '2') {
+      //   lcd.clear();
+      //   if (checkFingerprint() == true) {
+      //     if (check_layer2() == true) {       
+      //       controlLock();
+      //     }
+      //   }
+      //   currentMenu = 0;
+      //   displayMenu();
+      // } else if (key == '3') {
+      //   currentMenu = 2;
+      //   submenu = 0;
+      //   displayMenu();
+      // }
+      // break;
+      if (key == 'B') {
         currentMenu = 2;
         submenu = 0;
         displayMenu();
@@ -760,7 +757,6 @@ void setup() {
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
-  // Khởi động cảm biến vân tay
   finger.begin(57600);
   if (finger.verifyPassword()) {
     Serial.println("Cảm biến vân tay đã kết nối thành công!");
@@ -770,12 +766,6 @@ void setup() {
   }
 
   WiFi.begin(ssid, password);
-  // while (WiFi.status() != WL_CONNECTED) {
-  //   delay(1000);
-  //   Serial.println("Đang kết nối WiFi...");
-  // }
-  // Serial.println("Đã kết nối WiFi.");
-
   webSocket.begin(serverName, serverPort, "/ws/?type=esp32"); 
   webSocket.onEvent(webSocketEvent);
 
@@ -785,20 +775,41 @@ void setup() {
 
 void loop() {
   webSocket.loop();
-  char key = keypad.getKey(); // Đọc phím từ keypad
-  if (key) { // Nếu có phím nhấn
-    if (key == 'A') { // Phím quay lại
+  char key = keypad.getKey(); 
+  if (key) { 
+    if (key == 'A') { 
       if (submenu != 0) {
-        submenu = 0; // Quay lại mục trước đó
+        submenu = 0; 
         displayMenu();
       } else if (currentMenu != 0) {
-        currentMenu = 0; // Quay lại menu chính
+        currentMenu = 0;
         displayMenu();
       }
     } else {
-      navigateMenu(key); // Điều hướng menu dựa trên phím nhấn
+      navigateMenu(key); 
     }
   }
+
+  if (nfc.tagPresent()) {
+    if (checkNFC() == true) {
+      if (check_layer2() == true) {
+        controlLock();
+      }
+    }
+    currentMenu = 0;
+    displayMenu();
+  }
+
+  if (touch == HIGH) {
+    if (checkFingerprint() == true) {
+      if (check_layer2() == true) {       
+        controlLock();
+      }
+    }
+    currentMenu = 0;
+    displayMenu();
+  }
+
   if(vibrationDetected) {
     bot.sendMessage(CHAT_ID, "WARNING!!!", "");
     Serial.println("Vibration Detected");
