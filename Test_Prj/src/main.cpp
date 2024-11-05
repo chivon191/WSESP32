@@ -101,35 +101,6 @@ void message_voice(int mode)
       delayMicroseconds(2500);
     }
   }
-  else if (mode == 2) {
-    // Biến tần số bắt đầu và kết thúc
-    int lowFreq = 400;  // Tần số thấp (Hz)
-    int highFreq = 1200; // Tần số cao (Hz)
-    
-    // Thời gian phát báo động (tính bằng ms)
-    unsigned long alarmDuration = 2000; // 2 giây
-    unsigned long startTime = millis();
-
-    while (millis() - startTime < alarmDuration) {
-      // Tăng tần số từ lowFreq lên highFreq
-      for (int freq = lowFreq; freq <= highFreq; freq += 20) {
-        unsigned long period = 1000000 / freq; // Chu kỳ tính bằng microsecond
-        digitalWrite(buzzerPin, HIGH);
-        delayMicroseconds(period / 2);
-        digitalWrite(buzzerPin, LOW);
-        delayMicroseconds(period / 2);
-      }
-
-      // Giảm tần số từ highFreq xuống lowFreq
-      for (int freq = highFreq; freq >= lowFreq; freq -= 20) {
-        unsigned long period = 1000000 / freq; // Chu kỳ tính bằng microsecond
-        digitalWrite(buzzerPin, HIGH);
-        delayMicroseconds(period / 2);
-        digitalWrite(buzzerPin, LOW);
-        delayMicroseconds(period / 2);
-      }
-    }
-  }
 }
 
 
@@ -256,137 +227,150 @@ char read_character()
   return '\0';
 }
 
-int check_password()
-{
-  String pass = "";
-  char key = '\0';
-  int count = 3;
-  int size = 4;
-  lcd.clear();
-  lcd.setCursor(1,0);
-  lcd.print("ENTER PASSWORD");
-  lcd.setCursor(5,1);
-  while (count)
-  {
-    while (size)
-    {
-      key = read_character();
-      delay(1);
-      if (key != '\0' && key >= '1' && key <= '9')
-      {
-        Serial.print(key);
-        lcd.print(key);
-        pass += String(key);
-        key = '\0';
-        size--;
-      }
-      else if (key == 'D')
-      {
-        size = 4;
-        pass = "";
-        lcd.setCursor(5,1);
-        lcd.print("      ");
-        lcd.setCursor(5,1);
-        Serial.println("\nReset enter password...");
-      }
-      else if(key == 'A') return 0;
-    }
-    if (pass == correct_pass) break;
-    else
-    {
-      pass = "";
-      count--;
-      size = 4;
-      if (count)
-      {
-        Serial.println("\nFailed........");
-        Serial.println("You have " + String(count) + " times for enter password.");
-        Serial.println("You must wait 3 seconds.");
-        delay(3000);
-        Serial.println("----------------------------------------------------");
-        Serial.println("Enter password again.....");
-        lcd.setCursor(5,1);
-        lcd.print("      ");
-        lcd.setCursor(5,1);
+bool virtual_password(String pass) {
+  if (pass.length() < password.length()) return false;
+  for (int i=0; i<= pass.length() - password.length(); i++) {
+    bool found = true;
+    for (int j=0; j < password.length(); j++) {
+      if (pass[i+j] != password[j]) {
+        found = false;
+        break;
       }
     }
+    if (found) return true;
   }
-  if (count) return 1;
-  return 0;
+  return false;
 }
 
-int change_password()
-{
+bool check_password() {
+  String pass = ""; // Chuỗi mật khẩu nhập vào
+  char key = '\0';
+  int count = 3; // Số lần thử
+
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(1, 0);
+  lcd.print("ENTER PASSWORD");
+  lcd.setCursor(5, 1);
+
+  while (count) {
+    key = read_character(); // Đọc ký tự từ bàn phím
+    delay(1); // Đợi 1 ms
+
+    // Kiểm tra nếu ký tự là số
+    if (key != '\0' && key >= '0' && key <= '9') {
+      Serial.print(key);
+      lcd.print(key);
+      pass += String(key); // Thêm ký tự vào mật khẩu
+    } 
+    // Kiểm tra nếu ký tự là 'D' để đặt lại
+    else if (key == 'D') {
+      pass = ""; // Đặt lại mật khẩu
+      lcd.setCursor(5, 1);
+      lcd.print("      "); // Xóa mật khẩu trên màn hình
+      lcd.setCursor(5, 1);
+      Serial.println("\nReset enter password...");
+    } 
+    // Kiểm tra nếu ký tự là 'C' để xác nhận
+    else if (key == 'C') {
+      if (virtual_password(pass)) {
+        return true; // Mật khẩu đúng
+      } else {
+        pass = ""; // Đặt lại mật khẩu
+        count--; // Giảm số lần thử
+        if (count) {
+          Serial.println("\nFailed........");
+          Serial.println("You have " + String(count) + " attempts left.");
+          Serial.println("You must wait 3 seconds.");
+          delay(3000);
+          Serial.println("----------------------------------------------------");
+          Serial.println("Enter password again.....");
+          lcd.setCursor(5, 1);
+          lcd.print("      "); // Xóa mật khẩu trên màn hình
+          lcd.setCursor(5, 1);
+        }
+      }
+    } 
+    // Kiểm tra nếu ký tự là 'A' để thoát
+    else if (key == 'A') {
+      return false; // Thoát khỏi hàm
+    }
+  }
+  return false; // Nếu không thành công
+}
+
+
+bool change_password() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
   lcd.print("Change password");
   delay(1000);
   Serial.println("Enter your password.....");
-  int check = check_password();
-  if (check == 1)
-  {
-    String newPass1 = "";
-    String newPass2 = "";
-    int times_enter = 2;
-    while (times_enter)
-    {
-      String pass = "";
-      int size = 4;
-      if (times_enter == 2)
-      {
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print("Enter new pass");
-        Serial.println("\nEnter your new password.......");
-      }
-      else
-      {
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print("Re-enter pass");
-        Serial.println("\nRe-enter your new password......");
-      }
-      lcd.setCursor(5,1);
-      while (size)
-      {
-        char key = read_character();
-        delay(1);
-        if (key >= '1' && key <= '9')
-        {
+
+  if (!check_password()) {
+    return false; // Nếu mật khẩu không đúng, trả về false
+  }
+
+  String newPass1 = "";
+  String newPass2 = "";
+  int times_enter = 2;
+
+  while (times_enter) {
+    String pass = "";
+    int size = 4;
+
+    if (times_enter == 2) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Enter new pass");
+      Serial.println("\nEnter your new password.......");
+
+    } else {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Re-enter pass");
+      Serial.println("\nRe-enter your new password......");
+    }
+
+    lcd.setCursor(5, 1);
+    while (size) {
+      char key = read_character();
+      delay(1);
+      if (key >= '1' && key <= '9') {
           Serial.print(key);
           lcd.print(key);
           pass += String(key);
-          key = '\0';
-          size--;
-        }
-        else if (key == 'D')
-        {
-          size = 4;
-          pass = "";
-          lcd.setCursor(5,1);
-          lcd.print("      ");
-          lcd.setCursor(5,1);
+          size--; // Giảm kích thước
+      } else if (key == 'D') {
+          size = 4; // Đặt lại kích thước
+          pass = ""; // Đặt lại mật khẩu
+          lcd.setCursor(5, 1);
+          lcd.print("      "); // Xóa mật khẩu trên màn hình
+          lcd.setCursor(5, 1);
           Serial.println("\nReset enter password...");
-        }
-        else if (key == 'A')
-        {
+      } else if (key == 'A') {
           lcd.clear();
           lcd.print("Exit");
           delay(1000);
-          return 0;
-        }
+          return false; // Thoát khỏi hàm
       }
-      if (times_enter == 2) newPass1 = pass;
-      else newPass2 = pass;
-      times_enter--;
     }
-    if (newPass1 == newPass2)
-    {
-      correct_pass = newPass1;
-      return 1;
+
+    // Ghi nhận mật khẩu mới
+    if (times_enter == 2) {
+      newPass1 = pass;
+    } else {
+      newPass2 = pass;
     }
+    times_enter--;
   }
-  return 0;
+
+  // Kiểm tra nếu 2 mật khẩu mới khớp nhau
+  if (newPass1 == newPass2) {
+    correct_pass = newPass1; // Gán mật khẩu mới
+    return true; // Mật khẩu đã được thay đổi thành công
+  }
+
+  return false; // Nếu mật khẩu không khớp
 }
 
 bool deleteFingerprint() {
