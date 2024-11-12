@@ -12,14 +12,17 @@
 #include <ESP32Servo.h>
 #include <UniversalTelegramBot.h>
 #include <ArduinoJson.h>
+#include <esp_wifi.h>
+#include <esp_sleep.h>
+
+#define wakeupPin 4
 
 #define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
 #define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
 
 #define PIN_SG90 23 // Output pin used
-#define sw420Pin 15
 #define buzzerPin 2
-#define vibSensor 15
+#define vibSensor 35
 
 #define BOTtoken "8018398195:AAEw9i4XVnDLDfUnfiWiYjIBMepotF89Zkw"  // Your Bot Token
 #define CHAT_ID "6008983815"
@@ -64,7 +67,7 @@ const char* password = "1234567890";
 const char* serverName = "172.20.10.2"; 
 const int serverPort = 8080; 
 int door_stat;
-bool vibrationDetected = false;
+bool vibrationDetected;
 
 Servo sg90;
 
@@ -228,11 +231,11 @@ char read_character()
 }
 
 bool virtual_password(String pass) {
-  if (pass.length() < password.length()) return false;
-  for (int i=0; i<= pass.length() - password.length(); i++) {
+  if (pass.length() < correct_pass.length()) return false;
+  for (int i=0; i<= pass.length() - correct_pass.length(); i++) {
     bool found = true;
-    for (int j=0; j < password.length(); j++) {
-      if (pass[i+j] != password[j]) {
+    for (int j=0; j < correct_pass.length(); j++) {
+      if (pass[i+j] != correct_pass[j]) {
         found = false;
         break;
       }
@@ -259,7 +262,7 @@ bool check_password() {
     // Kiểm tra nếu ký tự là số
     if (key != '\0' && key >= '0' && key <= '9') {
       Serial.print(key);
-      lcd.print(key);
+      lcd.print("*");
       pass += String(key); // Thêm ký tự vào mật khẩu
     } 
     // Kiểm tra nếu ký tự là 'D' để đặt lại
@@ -337,7 +340,7 @@ bool change_password() {
       delay(1);
       if (key >= '1' && key <= '9') {
           Serial.print(key);
-          lcd.print(key);
+          lcd.print("*");
           pass += String(key);
           size--; // Giảm kích thước
       } else if (key == 'D') {
@@ -522,6 +525,17 @@ bool enrollFingerprint() {
   return false;
 }
 
+// void success() {
+//   tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+//   delay(125); // Đợi 125 ms
+//   tone(buzzerPin, 2700, 100); // Tần số 2700 Hz, thời gian 100 ms
+// }
+
+// // Hàm báo lỗi
+// void error() {
+//   tone(buzzerPin, 200, 1000); // Tần số 200 Hz, thời gian 1000 ms
+// }
+
 bool check_layer2() {
   lcd.clear();
   Serial.println("Enter your password........");
@@ -563,11 +577,9 @@ void displayMenu() {
   lcd.clear(); // Xóa màn hình LCD trước khi hiển thị nội dung mới
   switch (currentMenu) {
     case 0:
-      lcd.clear();
-      lcd.setCursor(1, 0);
-      lcd.print("Wellcome home")
-      lcd.setCursor(0, 1);
-      lcd.print("Scan finger/card")
+      lcd.print("1.NFC 2.Finger");
+      lcd.setCursor(0, 1); // Chuyển xuống dòng thứ 2
+      lcd.print("3.Setting");
       break;
     case 2: // Menu Cai Dat
       if (submenu == 0) {
@@ -610,35 +622,30 @@ void controlLock() {
   sg90.write(0);
   timedooropen = 1;
   timedoorclose = 1;
+  vibrationDetected = true;
 }
 
 void navigateMenu(char key) {
   switch (currentMenu) {
     case 0:
-      // if (key == '1') {
-      //   if (checkNFC() == true) {
-      //     if (check_layer2() == true) {
-      //       controlLock();
-      //     }
-      //   }
-      //   currentMenu = 0;
-      //   displayMenu();
-      // } else if (key == '2') {
-      //   lcd.clear();
-      //   if (checkFingerprint() == true) {
-      //     if (check_layer2() == true) {       
-      //       controlLock();
-      //     }
-      //   }
-      //   currentMenu = 0;
-      //   displayMenu();
-      // } else if (key == '3') {
-      //   currentMenu = 2;
-      //   submenu = 0;
-      //   displayMenu();
-      // }
-      // break;
-      if (key == 'B') {
+      if (key == '1') {
+        if (checkNFC() == true) {
+          if (check_layer2() == true) {
+            controlLock();
+          }
+        }
+        currentMenu = 0;
+        displayMenu();
+      } else if (key == '2') {
+        lcd.clear();
+        if (checkFingerprint() == true) {
+          if (check_layer2() == true) {       
+            controlLock();
+          }
+        }
+        currentMenu = 0;
+        displayMenu();
+      } else if (key == '3') {
         currentMenu = 2;
         submenu = 0;
         displayMenu();
@@ -730,24 +737,33 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   }
 }
 
-void IRAM_ATTR detectsVibration() {
-  vibrationDetected = true;
+unsigned long lastCheckTime = 0;
+unsigned long lastActivityTime = 0;
+unsigned long currentTime = 0;
+
+void check_vibration() {
+  int vibration = analogRead(vibSensor);
+  Serial.println(vibration);
+  if (vibration >= 3000) {
+    Serial.println("Vibration threshold reached! Sending alert to Telegram...");
+    bot.sendMessage(CHAT_ID, "Cảnh báo: Phát hiện rung động mạnh! Có thể đang xảy ra phá cửa hoặc phá khóa.", "");
+    message_voice(0);
+  }
 }
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
+  vibrationDetected = true;
   lcd.clear();
   lcd.init();
   lcd.backlight();
   displayMenu();
   delay(1);
-  pinMode(sw420Pin, INPUT);
   pinMode(18, INPUT_PULLUP);
   pinMode(buzzerPin, OUTPUT);
-  pinMode(vibSensor, INPUT);
+  pinMode(wakeupPin, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(vibSensor), detectsVibration, FALLING);
   client.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Root certificate for Telegram
 
   sg90.attach(PIN_SG90);
@@ -757,6 +773,7 @@ void setup() {
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
+  // Khởi động cảm biến vân tay
   finger.begin(57600);
   if (finger.verifyPassword()) {
     Serial.println("Cảm biến vân tay đã kết nối thành công!");
@@ -766,53 +783,53 @@ void setup() {
   }
 
   WiFi.begin(ssid, password);
+
   webSocket.begin(serverName, serverPort, "/ws/?type=esp32"); 
   webSocket.onEvent(webSocketEvent);
 
   Serial.println("WebSocket đang chờ kết nối...");
+  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)wakeupPin, 0);
   delay(100);
+  lastActivityTime = millis();
 }
 
 void loop() {
-  webSocket.loop();
-  char key = keypad.getKey(); 
-  if (key) { 
-    if (key == 'A') { 
+  char key = keypad.getKey(); // Đọc phím từ keypad
+  if (key) { // Nếu có phím nhấn
+    lastActivityTime = millis();
+    if (key == 'A') { // Phím quay lại
       if (submenu != 0) {
-        submenu = 0; 
+        submenu = 0; // Quay lại mục trước đó
         displayMenu();
       } else if (currentMenu != 0) {
-        currentMenu = 0;
+        currentMenu = 0; // Quay lại menu chính
         displayMenu();
       }
     } else {
-      navigateMenu(key); 
+      navigateMenu(key); // Điều hướng menu dựa trên phím nhấn
     }
   }
-
-  if (nfc.tagPresent()) {
-    if (checkNFC() == true) {
-      if (check_layer2() == true) {
-        controlLock();
-      }
-    }
+  webSocket.loop();
+  currentTime = millis();
+  if (currentTime - lastCheckTime >= 3000) {
+    lastCheckTime = currentTime;
+    check_vibration();
+  }
+  if (currentTime - lastActivityTime >= 20000) {
+    Serial.println("No activity for 10 seconds, going to light sleep...");
+    
+    // Tắt các thiết bị trước khi vào Light Sleep
+    lcd.noBacklight();
+    lcd.noDisplay(); // Tắt màn hình LCD
+    esp_light_sleep_start();
+    Serial.println("Woke up from light sleep!");
+    // Bật lại các thiết bị
     currentMenu = 0;
-    displayMenu();
-  }
-
-  if (touch == HIGH) {
-    if (checkFingerprint() == true) {
-      if (check_layer2() == true) {       
-        controlLock();
-      }
-    }
-    currentMenu = 0;
-    displayMenu();
-  }
-
-  if(vibrationDetected) {
-    bot.sendMessage(CHAT_ID, "WARNING!!!", "");
-    Serial.println("Vibration Detected");
-    vibrationDetected = false;
+    submenu = 0;
+    lcd.init();
+    lcd.backlight();
+    displayMenu(); // Bật lại màn hình LCD
+    lastActivityTime = millis();
   }
 }
