@@ -17,8 +17,8 @@
 
 #define wakeupPin 4
 
-#define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
-#define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
+#define RXD2 3   // Chân RX của ESP32 (kết nối với TX của AS608)
+#define TXD2 1   // Chân TX của ESP32 (kết nối với RX của AS608)
 
 #define PIN_SG90 23 // Output pin used
 #define buzzerPin 2
@@ -31,8 +31,8 @@ WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
 WebSocketsClient webSocket;  
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+// HardwareSerial mySerial(0);  // Serial2 sử dụng TXD2 và RXD2
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&Serial);
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
@@ -764,7 +764,7 @@ void check_vibration() {
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(57600);
   vibrationDetected = true;
   lcd.clear();
   lcd.init();
@@ -781,7 +781,7 @@ void setup() {
   sg90.attach(PIN_SG90);
   sg90.write(3);
   nfc.begin();
-  mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
+  // mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
@@ -807,7 +807,7 @@ void setup() {
 }
 
 void loop() {
-  webSocket.loop();
+  // webSocket.loop();
   currentTime = millis();
   char key = keypad.getKey(); 
   if (key) { 
