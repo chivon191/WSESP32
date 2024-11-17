@@ -31,8 +31,8 @@ WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
 WebSocketsClient webSocket;  
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+// HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&Serial);
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
@@ -167,14 +167,20 @@ bool check_password() {
         pass = ""; // Đặt lại mật khẩu
         count--; // Giảm số lần thử
         if (count) {
+          lcd.setCursor(1, 0);
+          lcd.print("Wrong          ");
+          lcd.setCursor(0, 1);
+          lcd.print(String(count) + " attempts left.");
           Serial.println("\nFailed........");
           Serial.println("You have " + String(count) + " attempts left.");
           Serial.println("You must wait 3 seconds.");
           delay(3000);
           Serial.println("----------------------------------------------------");
           Serial.println("Enter password again.....");
-          lcd.setCursor(5, 1);
-          lcd.print("      "); // Xóa mật khẩu trên màn hình
+          lcd.setCursor(1, 0);
+          lcd.print("ENTER PASSWORD");
+          lcd.setCursor(0, 1);
+          lcd.print("                 "); // Xóa mật khẩu trên màn hình
           lcd.setCursor(5, 1);
         }
       }
@@ -764,7 +770,7 @@ void check_vibration() {
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(57600);
   vibrationDetected = true;
   lcd.clear();
   lcd.init();
@@ -781,7 +787,6 @@ void setup() {
   sg90.attach(PIN_SG90);
   sg90.write(3);
   nfc.begin();
-  mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
