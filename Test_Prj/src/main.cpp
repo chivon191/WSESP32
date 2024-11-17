@@ -62,9 +62,9 @@ Keypad keypad = Keypad(makeKeymap(keys), rowPins, columnPins, rows, columns);
 
 uint8_t id = 0;
 
-const char* ssid = "FPT Telecom";
-const char* password = "vonvaquoc";
-const char* serverName = "192.168.1.8"; 
+const char* ssid = "donnn";
+const char* password = "1234567890";
+const char* serverName = "172.20.10.2"; 
 const int serverPort = 8080; 
 int door_stat;
 bool vibrationDetected;
