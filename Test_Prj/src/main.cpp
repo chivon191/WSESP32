@@ -31,11 +31,7 @@ WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
 WebSocketsClient webSocket;  
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-<<<<<<< HEAD
-// HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
-=======
 // HardwareSerial mySerial(0);  // Serial2 sử dụng TXD2 và RXD2
->>>>>>> 45a6be5cd8940ca3452dd752520498ea9840554f
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&Serial);
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
@@ -70,15 +66,15 @@ const char* ssid = "donnn";
 const char* password = "1234567890";
 const char* serverName = "172.20.10.2"; 
 const int serverPort = 8080; 
-int door_stat;
+uint8_t door_stat;
 bool vibrationDetected;
 unsigned long lastCheckTime;
 unsigned long lastActivityTime;
 unsigned long currentTime;
-
+uint8_t mode = 2;
 Servo sg90;
 
-void message_voice(int mode)
+void message_voice(uint8_t mode)
 {
   if(mode)
   {
@@ -599,7 +595,7 @@ int currentMenu = 0;
 int submenu = 0;
 
 void displayMenu() {
-  lcd.clear(); // Xóa màn hình LCD trước khi hiển thị nội dung mới
+  lcd.clear();
   switch (currentMenu) {
     case 0:
       lcd.print("1.NFC 2.Finger");
@@ -746,19 +742,43 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_DISCONNECTED:
       Serial.println("WebSocket đã ngắt kết nối.");
       break;
+
     case WStype_CONNECTED:
       Serial.println("Kết nối WebSocket thành công!");
       webSocket.sendTXT("Xin chào từ ESP32!");
       webSocket.sendTXT("Password:" + correct_pass);
       break;
+
     case WStype_TEXT:
       Serial.printf("Dữ liệu nhận được từ server: %s\n", payload);
-      
+
+      // Xử lý lệnh mở cửa
       if (String((char*)payload) == "opendoor") {
-        Serial.println("OPEN DOOR");
-        controlLock();   
-        Serial.println("CLOSE DOOR");
-        webSocket.sendTXT("closedoor");
+        controlLock();
+        webSocket.sendTXT("closedoor"); // Gửi tín hiệu đã đóng cửa
+      }
+
+      if (String((char*)payload) == "playspeaker") {
+        message_voice(0);
+        delay(500);
+        message_voice(0);
+      }
+
+      if (String((char*)payload) == "2FA_ON") {
+        mode = 2;
+        Serial.print("Chế độ bảo mật: 1 lớp");
+      }
+
+      if (String((char*)payload) == "2FA_OFF") {
+        mode = 1;
+        Serial.print("Chế độ bảo mật: 2 lớp");
+      }
+
+      // Cập nhật mật khẩu
+      if (String((char*)payload).startsWith("ChangePassword: ")) {
+        correct_pass = String((char*)payload).substring(strlen("ChangePassword: "));
+        Serial.print("Mật khẩu mới đã được cập nhật:");
+        Serial.println(correct_pass);
       }
       break;
   }
@@ -791,10 +811,7 @@ void setup() {
   sg90.attach(PIN_SG90);
   sg90.write(3);
   nfc.begin();
-<<<<<<< HEAD
-=======
   // mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
->>>>>>> 45a6be5cd8940ca3452dd752520498ea9840554f
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
@@ -820,7 +837,7 @@ void setup() {
 }
 
 void loop() {
-  // webSocket.loop();
+  webSocket.loop();
   currentTime = millis();
   char key = keypad.getKey(); 
   if (key) { 
