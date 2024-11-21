@@ -71,7 +71,7 @@ bool vibrationDetected;
 unsigned long lastCheckTime;
 unsigned long lastActivityTime;
 unsigned long currentTime;
-uint8_t mode = 2;
+String mode = "2FA";
 Servo sg90;
 
 void message_voice(uint8_t mode)
@@ -594,32 +594,6 @@ bool check_layer2() {
 int currentMenu = 0;
 int submenu = 0;
 
-void displayMenu() {
-  lcd.clear();
-  switch (currentMenu) {
-    case 0:
-      lcd.print("1.NFC 2.Finger");
-      lcd.setCursor(0, 1); // Chuyển xuống dòng thứ 2
-      lcd.print("3.Setting");
-      break;
-    case 2: // Menu Cai Dat
-      if (submenu == 0) {
-        lcd.print("1.Change Pass");
-        lcd.setCursor(0, 1);
-        lcd.print("2.NFC 3.Finger");
-      } else if (submenu == 1) {
-        lcd.print("1: Them van tay");
-        lcd.setCursor(0, 1);
-        lcd.print("2: Xoa van tay");
-      } else if (submenu == 2) {
-        lcd.print("1: Them the");
-        lcd.setCursor(0, 1);
-        lcd.print("2: Xoa the");
-      }
-      break;
-  }
-}
-
 void controlLock() {
   vibrationDetected = false;
   int timedoorclose = 1, timedooropen = 1;
@@ -647,89 +621,127 @@ void controlLock() {
   lastActivityTime = millis();
 }
 
-void navigateMenu(char key) {
-  lastActivityTime = millis();
+void displayMenu() {
+  lcd.clear();
   switch (currentMenu) {
-    case 0:
-      if (key == '1') {
-        if (checkNFC() == true) {
-          if (check_layer2() == true) {
-            controlLock();
-          }
-        }
-        currentMenu = 0;
-        displayMenu();
-      } else if (key == '2') {
-        lcd.clear();
-        if (checkFingerprint() == true) {
-          if (check_layer2() == true) {       
-            controlLock();
-          }
-        }
-        currentMenu = 0;
-        displayMenu();
-      } else if (key == '3') {
-        currentMenu = 2;
-        submenu = 0;
-        displayMenu();
+    case 0: // Menu chính
+      lcd.print("1.NFC 2.Finger");
+      lcd.setCursor(0, 1); // Chuyển xuống dòng thứ 2
+      if (mode == "1FA") {
+        lcd.print("3.Password");
+      } else {
+        lcd.print("3.Setting");
       }
       break;
-    case 2: // Menu Cai Dat
-      if (submenu == 0) {
-        if (key == '1') {
+
+    case 2: // Menu Cài đặt
+      if (submenu == 0) { // Menu chính của Cài đặt
+        lcd.print("1.Change Pass");
+        lcd.setCursor(0, 1);
+        lcd.print("2.NFC 3.Finger");
+      } else if (submenu == 1) { // Quản lý vân tay
+        lcd.print("1: Add Finger");
+        lcd.setCursor(0, 1);
+        lcd.print("2: Del Finger");
+      } else if (submenu == 2) { // Quản lý thẻ NFC
+        lcd.print("1: Add Card");
+        lcd.setCursor(0, 1);
+        lcd.print("2: Del Card");
+      }
+      break;
+  }
+}
+
+void navigateMenu(char key) {
+  lastActivityTime = millis(); // Cập nhật thời gian hoạt động cuối cùng
+
+  switch (currentMenu) {
+    case 0: // Menu chính
+      if (key == '1') { // NFC
+        if (checkNFC() == true) {
+          if (mode == "1FA" || check_layer2() == true) {
+            controlLock(); // Mở khóa
+          }
+        }
+        displayMenu(); // Quay lại menu chính
+      } else if (key == '2') { // Vân tay
+        lcd.clear();
+        if (checkFingerprint() == true) {
+          if (mode == "1FA" || check_layer2() == true) {
+            controlLock(); // Mở khóa
+          }
+        }
+        displayMenu(); // Quay lại menu chính
+      } else if (key == '3') {
+        if (mode == "1FA") { // Mở khóa bằng mật khẩu
+          if (check_password() == true) {
+            controlLock(); // Mở khóa
+          }
+        } else { // Chuyển sang menu Cài đặt
+          currentMenu = 2;
+          submenu = 0;
+          displayMenu();
+        }
+      }
+      break;
+
+    case 2: // Menu Cài đặt
+      if (submenu == 0) { // Menu chính của Cài đặt
+        if (key == '1') { // Đổi mật khẩu
           lcd.clear();
           if (change_password() == 1) {
             lcd.clear();
             lcd.print("SUCCESS");
-            delay(2000);
           } else {
             lcd.clear();
             lcd.print("ERROR");
-            delay(2000);
           }
-          currentMenu = 0;
+          delay(2000);
+          currentMenu = 0; // Quay lại menu chính
           displayMenu();
-        } else if (key == '2') {
-          submenu = 2; // Chuyển sang Quản lý nfc
+        } else if (key == '2') { // Quản lý NFC
+          submenu = 2;
           displayMenu();
-        } else if (key == '3') {
-          submenu = 1; // Chuyển sang Quản lý vân tay
+        } else if (key == '3') { // Quản lý vân tay
+          submenu = 1;
           displayMenu();
         }
-      } else if (submenu == 1) {
-        if (key == '1') {
+      } else if (submenu == 1) { // Quản lý vân tay
+        if (key == '1') { // Thêm vân tay
           lcd.clear();
           if (enrollFingerprint() == true) {
-            lcd.clear();
-            lcd.print("Add finger success");
+            lcd.print("Add finger OK!");
           } else {
-            lcd.clear();
             lcd.print("Error add finger");
           }
-          currentMenu = 0;
+          delay(2000);
+          currentMenu = 0; // Quay lại menu chính
           displayMenu();
-        } else if (key == '2') {
+        } else if (key == '2') { // Xóa vân tay
           lcd.clear();
           if (deleteFingerprint() == true) {
-            lcd.clear();
-            lcd.print("Del finger success");
+            lcd.print("Del finger OK!");
           } else {
-            lcd.clear();
             lcd.print("Error del finger");
           }
-          currentMenu = 0;
+          delay(2000);
+          currentMenu = 0; // Quay lại menu chính
           displayMenu();
         }
-      } else if (submenu == 2) {
-        if (key == '1') {
+      } else if (submenu == 2) { // Quản lý NFC
+        if (key == '1') { // Thêm thẻ NFC
+          lcd.clear();
           addnfc();
-          Serial.print("Pass: ");
-          Serial.print(correct_pass);
-          currentMenu = 0;
+          lcd.print("Add card OK!");
+          delay(2000);
+          currentMenu = 0; // Quay lại menu chính
           displayMenu();
-        } else if (key == '2') {
+        } else if (key == '2') { // Xóa thẻ NFC
+          lcd.clear();
           removenfc();
-          currentMenu = 0;
+          lcd.print("Del card OK!");
+          delay(2000);
+          currentMenu = 0; // Quay lại menu chính
           displayMenu();
         }
       }
@@ -746,7 +758,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_CONNECTED:
       Serial.println("Kết nối WebSocket thành công!");
       webSocket.sendTXT("Xin chào từ ESP32!");
-      webSocket.sendTXT("Password:" + correct_pass);
+      webSocket.sendTXT("Password: " + correct_pass);
+      webSocket.sendTXT("Mode: " + mode);  // Gửi chế độ bảo mật hiện tại
       break;
 
     case WStype_TEXT:
@@ -758,27 +771,18 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         webSocket.sendTXT("closedoor"); // Gửi tín hiệu đã đóng cửa
       }
 
-      if (String((char*)payload) == "playspeaker") {
-        message_voice(0);
-        delay(500);
-        message_voice(0);
-      }
-
-      if (String((char*)payload) == "2FA_ON") {
-        mode = 2;
-        Serial.print("Chế độ bảo mật: 1 lớp");
-      }
-
-      if (String((char*)payload) == "2FA_OFF") {
-        mode = 1;
-        Serial.print("Chế độ bảo mật: 2 lớp");
-      }
-
       // Cập nhật mật khẩu
-      if (String((char*)payload).startsWith("ChangePassword: ")) {
-        correct_pass = String((char*)payload).substring(strlen("ChangePassword: "));
+      if (String((char*)payload).startsWith("Password: ")) {
+        correct_pass = String((char*)payload).substring(strlen("Password: "));
         Serial.print("Mật khẩu mới đã được cập nhật:");
         Serial.println(correct_pass);
+      }
+
+      // Cập nhật chế độ bảo mật
+      if (String((char*)payload).startsWith("Mode: ")) {
+        mode = String((char*)payload).substring(strlen("Mode: "));
+        Serial.print("Chế độ bảo mật đã được cập nhật:");
+        Serial.println(mode);
       }
       break;
   }
@@ -825,59 +829,84 @@ void setup() {
   }
 
   WiFi.begin(ssid, password);
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(1000);
+  //   Serial.println("Đang kết nối WiFi...");
+  // }
+  // Serial.println("Đã kết nối WiFi.");
 
   webSocket.begin(serverName, serverPort, "/ws/?type=esp32"); 
   webSocket.onEvent(webSocketEvent);
 
   Serial.println("WebSocket đang chờ kết nối...");
-  esp_wifi_set_ps(WIFI_PS_MIN_MODEM);
-  esp_sleep_enable_ext1_wakeup((1ULL << wakeupPin) | (1ULL << vibSensor), ESP_EXT1_WAKEUP_ANY_HIGH);
   delay(100);
   lastActivityTime = millis();
 }
 
-void loop() {
-  webSocket.loop();
+void enterLightSleep() {
+  Serial.println("Không có hoạt động trong 20 giây, chuyển sang chế độ Light Sleep...");
+  lcd.noBacklight();
+  lcd.noDisplay();
+  
+  // Thiết lập điều kiện đánh thức
+  WiFi.disconnect(true);
+  esp_sleep_enable_ext1_wakeup((1ULL << wakeupPin) | (1ULL << vibSensor), ESP_EXT1_WAKEUP_ANY_HIGH);
+  esp_light_sleep_start(); // Vào chế độ Light Sleep
+  WiFi.begin(ssid, password);
+  // Sau khi thoát chế độ sleep
+  Serial.println("Đã thoát Light Sleep!");
+  lcd.init();
+  lcd.backlight();
+  displayMenu(); // Hiển thị lại menu
+  lastActivityTime = millis();
+}
+
+
+void main_function() {
   currentTime = millis();
-  char key = keypad.getKey(); 
+  char key = keypad.getKey();
+
+  // Xử lý phím bấm
   if (key) { 
+    lastActivityTime = currentTime; // Cập nhật thời gian hoạt động
     if (key == 'A') { // Phím quay lại
       if (submenu != 0) {
         submenu = 0; // Quay lại mục trước đó
-        displayMenu();
       } else if (currentMenu != 0) {
         currentMenu = 0; // Quay lại menu chính
-        displayMenu();
       }
+      displayMenu(); // Hiển thị lại menu
     } else {
       navigateMenu(key); // Điều hướng menu dựa trên phím nhấn
     }
   }
 
-  // Chỉ kiểm tra cảm biến khi không mở khóa
-  if (currentTime - lastCheckTime >= 1000) { // Kiểm tra mỗi 1 giây
+  // Kiểm tra cảm biến rung khi không mở khóa
+  if (currentTime - lastCheckTime >= 5000) { // Kiểm tra mỗi 1 giây
     lastCheckTime = currentTime;
     if (!digitalRead(18)) {
-        check_vibration(); // Kiểm tra cảm biến rung
+      check_vibration(); // Kiểm tra cảm biến rung
     }
   }
 
-  // Kiểm tra thời gian không hoạt động để chuyển sang chế độ Light Sleep
+  // Kiểm tra trạng thái không hoạt động
   if (currentTime - lastActivityTime >= 20000) {
-    Serial.println("Không có hoạt động trong 20 giây, chuyển sang chế độ Light Sleep...");
-    
-    // Tắt các thiết bị trước khi vào Light Sleep
-    lcd.noBacklight();
-    lcd.noDisplay(); // Tắt màn hình LCD
-    esp_light_sleep_start();
-    
-    // Khởi động lại sau khi thoát Light Sleep
-    Serial.println("Đã thoát Light Sleep!");
-    currentMenu = 0;
-    submenu = 0;
-    lcd.init();
-    lcd.backlight();
-    displayMenu(); // Hiển thị lại menu trên LCD
-    lastActivityTime = millis();
+    enterLightSleep();
   }
 }
+
+
+void loop() { 
+  if (WiFi.status() == WL_CONNECTED) {
+    webSocket.loop();
+    main_function();
+  } else {
+    static unsigned long lastConnectAttempt = 0;
+    if (millis() - lastConnectAttempt >= 5000) { // Thử kết nối lại mỗi 5 giây
+      lastConnectAttempt = millis();
+      WiFi.begin(ssid, password);
+    }
+    main_function();
+  }
+}
+
