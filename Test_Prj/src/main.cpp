@@ -14,11 +14,12 @@
 #include <ArduinoJson.h>
 #include <esp_wifi.h>
 #include <esp_sleep.h>
+#include <Preferences.h>
 
 #define wakeupPin 4
 
-#define RXD2 3   // Chân RX của ESP32 (kết nối với TX của AS608)
-#define TXD2 1   // Chân TX của ESP32 (kết nối với RX của AS608)
+#define RXD2 16   // Chân RX của ESP32 (kết nối với TX của AS608)
+#define TXD2 17   // Chân TX của ESP32 (kết nối với RX của AS608)
 
 #define PIN_SG90 23 // Output pin used
 #define buzzerPin 2
@@ -27,12 +28,13 @@
 #define BOTtoken "8018398195:AAEw9i4XVnDLDfUnfiWiYjIBMepotF89Zkw"  // Your Bot Token
 #define CHAT_ID "6008983815"
 
+Preferences preferences;
 WiFiClientSecure client;
 UniversalTelegramBot bot(BOTtoken, client);
 WebSocketsClient webSocket;  
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-// HardwareSerial mySerial(0);  // Serial2 sử dụng TXD2 và RXD2
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&Serial);
+HardwareSerial mySerial(2);  // Serial2 sử dụng TXD2 và RXD2
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 PN532_I2C pn532_i2c(Wire);
 NfcAdapter nfc = NfcAdapter(pn532_i2c);
 
@@ -68,11 +70,29 @@ const char* serverName = "172.20.10.2";
 const int serverPort = 8080; 
 uint8_t door_stat;
 bool vibrationDetected;
-unsigned long lastCheckTime;
-unsigned long lastActivityTime;
+unsigned long lastCheckTime = 0;
+unsigned long lastActivityTime = 0;
 unsigned long currentTime;
 String mode = "2FA";
 Servo sg90;
+
+void savePreferences() {
+  preferences.begin("my-app", false);  // Khởi tạo namespace với chế độ ghi
+  preferences.putString("password", correct_pass);
+  preferences.putString("mode", mode);
+  preferences.end();  // Đóng namespace để giải phóng tài nguyên
+  Serial.println("Dữ liệu đã được lưu.");
+}
+
+void readPreferences() {
+  preferences.begin("my-app", true);  // Khởi tạo namespace với chế độ chỉ đọc
+  correct_pass = preferences.getString("password", "1911");  // Giá trị mặc định là "1911"
+  mode = preferences.getString("mode", "2FA");               // Giá trị mặc định là "2FA"
+  preferences.end();  // Đóng namespace
+  Serial.println("Dữ liệu đã được tải:");
+  Serial.println("Mật khẩu: " + correct_pass);
+  Serial.println("Chế độ: " + mode);
+}
 
 void message_voice(uint8_t mode)
 {
@@ -190,6 +210,9 @@ bool check_password() {
       return false; // Thoát khỏi hàm
     }
   }
+  if (WiFi.status() == WL_CONNECTED) {
+    bot.sendMessage(CHAT_ID, "Cảnh báo: Nhập sai mật khẩu quá nhiều lần!", "");
+  }
   return false; // Nếu không thành công
 }
 
@@ -230,7 +253,7 @@ bool change_password() {
     while (size) {
       char key = read_character();
       delay(1);
-      if (key >= '1' && key <= '9') {
+      if (key >= '0' && key <= '9') {
           Serial.print(key);
           lcd.print("*");
           pass += String(key);
@@ -307,6 +330,9 @@ bool checkNFC() {
   lcd.setCursor(2, 1);
   lcd.print("CHECK CARD");
   message_voice(0);
+  if (WiFi.status() == WL_CONNECTED) {
+    bot.sendMessage(CHAT_ID, "WARNING! FAIL SCAN NFC!", "");
+  }
   delay(1500);
   return false;
 }
@@ -471,6 +497,9 @@ bool checkFingerprint() {
       }
     }
   }
+  if (WiFi.status() == WL_CONNECTED) {
+    bot.sendMessage(CHAT_ID, "WARNING! FAIL SCAN FINGERFRINT!", "");
+  }
   Serial.println("Xác thực vân tay thất bại sau 3 lần thử.");
   lcd.clear();
   lcd.setCursor(1,0);
@@ -611,7 +640,9 @@ void controlLock() {
     while (timedooropen >= 5 && digitalRead(18))
     {
       message_voice(0);
-      bot.sendMessage(CHAT_ID, "WARNING! DOOR IS OPENING TOO LONG!", "");
+      if (WiFi.status() == WL_CONNECTED) {
+        bot.sendMessage(CHAT_ID, "WARNING! DOOR IS OPENING TOO LONG!", "");
+      }
     }
   }
   sg90.write(0);
@@ -619,9 +650,11 @@ void controlLock() {
   timedoorclose = 1;
   vibrationDetected = true;
   lastActivityTime = millis();
+  webSocket.sendTXT("closedoor");
 }
 
 void displayMenu() {
+  lastActivityTime = millis();
   lcd.clear();
   switch (currentMenu) {
     case 0: // Menu chính
@@ -653,14 +686,14 @@ void displayMenu() {
 }
 
 void navigateMenu(char key) {
-  lastActivityTime = millis(); // Cập nhật thời gian hoạt động cuối cùng
-
   switch (currentMenu) {
     case 0: // Menu chính
       if (key == '1') { // NFC
         if (checkNFC() == true) {
           if (mode == "1FA" || check_layer2() == true) {
             controlLock(); // Mở khóa
+            // currentMenu = 0;
+            // displayMenu();
           }
         }
         displayMenu(); // Quay lại menu chính
@@ -675,7 +708,11 @@ void navigateMenu(char key) {
       } else if (key == '3') {
         if (mode == "1FA") { // Mở khóa bằng mật khẩu
           if (check_password() == true) {
+            lcd.clear();
+            lcd.setCursor(5, 0);
+            lcd.print("SUCCESS");
             controlLock(); // Mở khóa
+            displayMenu();
           }
         } else { // Chuyển sang menu Cài đặt
           currentMenu = 2;
@@ -689,7 +726,7 @@ void navigateMenu(char key) {
       if (submenu == 0) { // Menu chính của Cài đặt
         if (key == '1') { // Đổi mật khẩu
           lcd.clear();
-          if (change_password() == 1) {
+          if (change_password() == true) {
             lcd.clear();
             lcd.print("SUCCESS");
           } else {
@@ -709,22 +746,14 @@ void navigateMenu(char key) {
       } else if (submenu == 1) { // Quản lý vân tay
         if (key == '1') { // Thêm vân tay
           lcd.clear();
-          if (enrollFingerprint() == true) {
-            lcd.print("Add finger OK!");
-          } else {
-            lcd.print("Error add finger");
-          }
-          delay(2000);
+          enrollFingerprint();
+          // delay(2000);
           currentMenu = 0; // Quay lại menu chính
           displayMenu();
         } else if (key == '2') { // Xóa vân tay
           lcd.clear();
-          if (deleteFingerprint() == true) {
-            lcd.print("Del finger OK!");
-          } else {
-            lcd.print("Error del finger");
-          }
-          delay(2000);
+          deleteFingerprint();
+          // delay(2000);
           currentMenu = 0; // Quay lại menu chính
           displayMenu();
         }
@@ -732,15 +761,15 @@ void navigateMenu(char key) {
         if (key == '1') { // Thêm thẻ NFC
           lcd.clear();
           addnfc();
-          lcd.print("Add card OK!");
-          delay(2000);
+          // lcd.print("Add card OK!");
+          // delay(2000);
           currentMenu = 0; // Quay lại menu chính
           displayMenu();
         } else if (key == '2') { // Xóa thẻ NFC
           lcd.clear();
           removenfc();
-          lcd.print("Del card OK!");
-          delay(2000);
+          // lcd.print("Del card OK!");
+          // delay(2000);
           currentMenu = 0; // Quay lại menu chính
           displayMenu();
         }
@@ -768,7 +797,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       // Xử lý lệnh mở cửa
       if (String((char*)payload) == "opendoor") {
         controlLock();
-        webSocket.sendTXT("closedoor"); // Gửi tín hiệu đã đóng cửa
+        // webSocket.sendTXT("closedoor"); // Gửi tín hiệu đã đóng cửa
       }
 
       // Cập nhật mật khẩu
@@ -776,6 +805,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         correct_pass = String((char*)payload).substring(strlen("Password: "));
         Serial.print("Mật khẩu mới đã được cập nhật:");
         Serial.println(correct_pass);
+        savePreferences();
+        lastActivityTime = millis();
       }
 
       // Cập nhật chế độ bảo mật
@@ -783,6 +814,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         mode = String((char*)payload).substring(strlen("Mode: "));
         Serial.print("Chế độ bảo mật đã được cập nhật:");
         Serial.println(mode);
+        savePreferences();
+        lastActivityTime = millis();
       }
       break;
   }
@@ -791,14 +824,17 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 void check_vibration() {
   if (digitalRead(vibSensor) == HIGH) {
     Serial.println("Vibration threshold reached! Sending alert to Telegram...");
-    bot.sendMessage(CHAT_ID, "Cảnh báo: Phát hiện rung động mạnh! Có thể đang xảy ra phá cửa hoặc phá khóa.", "");
+    if (WiFi.status() == WL_CONNECTED) {
+      bot.sendMessage(CHAT_ID, "Cảnh báo: Phát hiện rung động mạnh! Có thể đang xảy ra phá khóa.", "");
+    }
     message_voice(0);
   }
 }
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(57600);
+  Serial.begin(115200);
+  readPreferences();
   vibrationDetected = true;
   lcd.clear();
   lcd.init();
@@ -813,9 +849,9 @@ void setup() {
   client.setCACert(TELEGRAM_CERTIFICATE_ROOT); // Root certificate for Telegram
 
   sg90.attach(PIN_SG90);
-  sg90.write(3);
+  sg90.write(0);
   nfc.begin();
-  // mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
+  mySerial.begin(57600, SERIAL_8N1, RXD2, TXD2);
 
   Serial.println("\n\nAS608 Fingerprint sensor with add/delete/check");
 
@@ -829,72 +865,58 @@ void setup() {
   }
 
   WiFi.begin(ssid, password);
-  // while (WiFi.status() != WL_CONNECTED) {
-  //   delay(1000);
-  //   Serial.println("Đang kết nối WiFi...");
-  // }
-  // Serial.println("Đã kết nối WiFi.");
 
   webSocket.begin(serverName, serverPort, "/ws/?type=esp32"); 
   webSocket.onEvent(webSocketEvent);
 
   Serial.println("WebSocket đang chờ kết nối...");
   delay(100);
-  lastActivityTime = millis();
 }
 
 void enterLightSleep() {
-  Serial.println("Không có hoạt động trong 20 giây, chuyển sang chế độ Light Sleep...");
+  Serial.println("Không có hoạt động trong 30 giây, chuyển sang chế độ Light Sleep...");
   lcd.noBacklight();
   lcd.noDisplay();
   
-  // Thiết lập điều kiện đánh thức
   WiFi.disconnect(true);
   esp_sleep_enable_ext1_wakeup((1ULL << wakeupPin) | (1ULL << vibSensor), ESP_EXT1_WAKEUP_ANY_HIGH);
   esp_light_sleep_start(); // Vào chế độ Light Sleep
   WiFi.begin(ssid, password);
-  // Sau khi thoát chế độ sleep
   Serial.println("Đã thoát Light Sleep!");
   lcd.init();
   lcd.backlight();
-  displayMenu(); // Hiển thị lại menu
-  lastActivityTime = millis();
+  displayMenu(); 
 }
 
 
 void main_function() {
-  currentTime = millis();
   char key = keypad.getKey();
-
-  // Xử lý phím bấm
   if (key) { 
-    lastActivityTime = currentTime; // Cập nhật thời gian hoạt động
-    if (key == 'A') { // Phím quay lại
+    lastActivityTime = millis(); 
+    if (key == 'A') { 
       if (submenu != 0) {
-        submenu = 0; // Quay lại mục trước đó
+        submenu = 0; 
       } else if (currentMenu != 0) {
-        currentMenu = 0; // Quay lại menu chính
+        currentMenu = 0; 
       }
-      displayMenu(); // Hiển thị lại menu
+      displayMenu(); 
     } else {
-      navigateMenu(key); // Điều hướng menu dựa trên phím nhấn
+      navigateMenu(key); 
     }
   }
 
-  // Kiểm tra cảm biến rung khi không mở khóa
-  if (currentTime - lastCheckTime >= 5000) { // Kiểm tra mỗi 1 giây
-    lastCheckTime = currentTime;
+  // if (millis() - lastCheckTime >= 1000) { 
+  //   lastCheckTime = millis();
     if (!digitalRead(18)) {
       check_vibration(); // Kiểm tra cảm biến rung
     }
-  }
+  // }
 
   // Kiểm tra trạng thái không hoạt động
-  if (currentTime - lastActivityTime >= 20000) {
+  if (millis() - lastActivityTime >= 30000) {
     enterLightSleep();
   }
 }
-
 
 void loop() { 
   if (WiFi.status() == WL_CONNECTED) {
@@ -909,4 +931,3 @@ void loop() {
     main_function();
   }
 }
-
